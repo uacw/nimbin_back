@@ -1,0 +1,17 @@
+ktor:
+  application:
+    modules:
+      - tech.nimbus.ApplicationKt.module
+  development: true
+
+jwt:
+  secret: "local-development-secret-key-change-in-production"
+  issuer: "http://localhost:8080/"
+  audience: "http://localhost:8080/api"
+  realm: "Access to 'api'"
+
+database:
+  url: "jdbc:postgresql://localhost:5432/nimbin_dev"
+  driver: "org.postgresql.Driver"
+  user: "postgres"
+  password: "postgres"

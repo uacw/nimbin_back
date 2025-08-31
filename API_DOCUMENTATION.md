@@ -4,8 +4,14 @@
 Nimbin Backend - это REST API для Android приложения типа Pastebin/Ghostbin, построенное на Kotlin/Ktor с PostgreSQL базой данных. Поддерживает создание, просмотр и управление текстовыми заметками с тремя уровнями видимости, пользовательские профили и расширенные возможности фильтрации.
 
 ## Базовый URL
+**Локальная разработка:**
 ```
 http://localhost:8080
+```
+
+**Production (Heroku):**
+```
+https://nimbin-back-1de949af6629.herokuapp.com
 ```
 > В production замените на ваш домен
 
@@ -15,15 +21,16 @@ API использует JWT токены для аутентификации. �
 Authorization: Bearer <jwt_token>
 ```
 
-**🚀 Статус разработки (18.08.2025):**
+**🚀 Статус разработки (31.08.2025):**
 - ✅ **Backend API полностью реализован и протестирован**
 - ✅ **PostgreSQL база данных настроена и работает**
 - ✅ **JWT аутентификация исправлена и полностью функциональна**
-- ✅ **Пользовательские профили с именем и username**
+- ✅ **Пользовательские профили с displayName и username**
 - ✅ **Фильтрация и сортировка заметок**
 - ✅ **Unit тесты покрывают основной функционал (87% покрытие)**
 - ✅ **Shared модуль для Android интеграции**
 - ✅ **Кириллица и UTF-8 поддерживаются корректно**
+- ✅ **Развернуто на Heroku и готово к использованию**
 
 **🎯 Готово к интеграции с Android приложением! 🎉**
 
@@ -70,10 +77,14 @@ Content-Type: application/json
         "username": "john_doe",
         "displayName": null,
         "email": "john@example.com",
-        "createdAt": "2025-08-18T10:00:00"
+        "createdAt": "2025-08-25T10:00:00"
     }
 }
 ```
+
+**Возможные ошибки:**
+- `400 Bad Request` - некорректные данные валидации
+- `409 Conflict` - пользователь с таким username или email уже существует
 
 #### Логин пользователя
 ```http
@@ -95,18 +106,22 @@ Content-Type: application/json
         "username": "john_doe",
         "displayName": "John Doe",
         "email": "john@example.com",
-        "createdAt": "2025-08-18T10:00:00"
+        "createdAt": "2025-08-25T10:00:00"
     }
 }
 ```
 
-**⚠️ ВАЖНОЕ ИЗМЕНЕНИЕ:** Логин теперь происходит строго по **email адресу**, а не по username. Это изменение вступило в силу 25.08.2025.
+**⚠️ ВАЖНОЕ ИЗМЕНЕНИЕ:** Логин теперь происходит строго по **email адресу**, а не по username.
+
+**Возможные ошибки:**
+- `400 Bad Request` - некорректные данные
+- `401 Unauthorized` - неверный email или пароль
 
 ---
 
 ### 👤 Пользовательские профили
 
-#### Получить профиль пользователя
+#### Получить публичный профиль пользователя
 ```http
 GET /api/users/{userId}
 ```
@@ -119,12 +134,14 @@ GET /api/users/{userId}
         "username": "john_doe",
         "displayName": "John Doe",
         "email": "john@example.com",
-        "createdAt": "2025-08-18T10:00:00"
+        "createdAt": "2025-08-25T10:00:00"
     },
     "publicPastesCount": 15,
     "totalPastesCount": null
 }
 ```
+
+**Примечание:** `totalPastesCount` всегда `null` для чужих профилей по соображениям приватности.
 
 #### Получить публичные заметки пользователя
 ```http
@@ -136,6 +153,31 @@ GET /api/users/{userId}/pastes?sort={createdAt|title|viewCount}&order={asc|desc}
 - `order`: `desc` (по умолчанию), `asc`
 - `limit`: максимум заметок (по умолчанию 20, максимум 100)
 - `offset`: пропустить заметок (для пагинации)
+
+**Ответ (200 OK):** Массив объектов заметок с информацией об авторе.
+
+#### Получить свой профиль (требует аутентификации)
+```http
+GET /api/users/profile
+Authorization: Bearer <jwt_token>
+```
+
+**Ответ (200 OK):**
+```json
+{
+    "user": {
+        "id": "uuid-string",
+        "username": "john_doe",
+        "displayName": "John Doe",
+        "email": "john@example.com",
+        "createdAt": "2025-08-25T10:00:00"
+    },
+    "publicPastesCount": 15,
+    "totalPastesCount": 23
+}
+```
+
+**Примечание:** `totalPastesCount` включает все заметки (включая PRIVATE) только для владельца профиля.
 
 #### Обновить профиль (требует аутентификации)
 ```http
@@ -156,30 +198,18 @@ Content-Type: application/json
     "username": "john_smith",
     "displayName": "John Smith",
     "email": "john@example.com",
-    "createdAt": "2025-08-18T10:00:00"
+    "createdAt": "2025-08-25T10:00:00"
 }
 ```
 
-#### Получить свой профиль (требует аутентификации)
-```http
-GET /api/users/profile
-Authorization: Bearer <jwt_token>
-```
+**Валидация:**
+- `username`: 3-50 символов, только буквы, цифры и подчеркивания
+- `displayName`: до 100 символов, может быть null
 
-**Ответ (200 OK):**
-```json
-{
-    "user": {
-        "id": "uuid-string",
-        "username": "john_doe",
-        "displayName": "John Doe",
-        "email": "john@example.com",
-        "createdAt": "2025-08-18T10:00:00"
-    },
-    "publicPastesCount": 15,
-    "totalPastesCount": 23
-}
-```
+**Возможные ошибки:**
+- `400 Bad Request` - ошибки валидации
+- `401 Unauthorized` - отсутствует или неверный токен
+- `409 Conflict` - username уже занят
 
 ---
 
@@ -189,7 +219,7 @@ Authorization: Bearer <jwt_token>
 ```http
 POST /api/pastes
 Content-Type: application/json
-Authorization: Bearer <jwt_token>  # Опционально
+Authorization: Bearer <jwt_token>  # Опционально для PUBLIC/UNLISTED, обязательно для PRIVATE
 
 {
     "title": "Название заметки",
@@ -204,6 +234,23 @@ Authorization: Bearer <jwt_token>  # Опционально
 - `PUBLIC` - видна всем, появляется в публичных списках
 - `UNLISTED` - доступна по прямой ссылке, не появляется в публичных списках
 - `PRIVATE` - доступна только автору (требует аутентификации)
+
+**Ответ (201 Created):**
+```json
+{
+    "id": "abc123def456",
+    "title": "Пример заметки",
+    "content": "Содержимое заметки...",
+    "userId": "user-uuid-123",
+    "authorUsername": "john_doe",
+    "authorDisplayName": "John Doe",
+    "visibility": "PUBLIC",
+    "createdAt": "2025-08-25T10:30:00",
+    "expiresAt": null,
+    "language": "kotlin",
+    "viewCount": 0
+}
+```
 
 #### Получить заметку по ID
 ```http
@@ -221,14 +268,14 @@ Authorization: Bearer <jwt_token>  # Для приватных заметок
     "authorUsername": "john_doe",
     "authorDisplayName": "John Doe",
     "visibility": "PUBLIC",
-    "createdAt": "2025-08-20T10:30:00",
+    "createdAt": "2025-08-25T10:30:00",
     "expiresAt": null,
     "language": "kotlin",
     "viewCount": 42
 }
 ```
 
-**Примечания:**
+**Особенности:**
 - Для анонимных заметок `userId`, `authorUsername` и `authorDisplayName` будут `null`
 - Счетчик просмотров автоматически увеличивается на 1 при каждом обращении
 - Доступ к заметкам проверяется по правилам видимости
@@ -244,8 +291,7 @@ GET /api/pastes/public?sort={createdAt|title|viewCount}&order={asc|desc}&limit=2
 - `limit`: максимум заметок (по умолчанию 20, максимум 100)
 - `offset`: пропустить заметок (для пагинации)
 
-**Ответ (200 OK):**
-Массив объектов заметок, аналогичных ответу `GET /api/pastes/{pasteId}`.
+**Ответ (200 OK):** Массив объектов заметок, аналогичных ответу `GET /api/pastes/{pasteId}`.
 
 #### Получить свои заметки (требует аутентификации)
 ```http
@@ -266,6 +312,18 @@ DELETE /api/pastes/{pasteId}
 Authorization: Bearer <jwt_token>
 ```
 
+**Ответ (200 OK):**
+```json
+{
+    "message": "Paste deleted successfully"
+}
+```
+
+**Возможные ошибки:**
+- `401 Unauthorized` - отсутствует токен
+- `403 Forbidden` - попытка удалить чужую заметку
+- `404 Not Found` - заметка не найдена
+
 ---
 
 ## 🎯 Рекомендации для Android разработчиков
@@ -282,7 +340,7 @@ Authorization: Bearer <jwt_token>
 
 **Для UI списков заметок:**
 - Отображайте `authorDisplayName` как основное имя. Если оно `null`, используйте `authorUsername`.
-- Показывайте `@author.username` как secondary text.
+- Показывайте `@authorUsername` как secondary text.
 - Используйте `userId` для навигации в профиль пользователя.
 
 ### Обработка ошибок
@@ -303,6 +361,13 @@ API возвращает ошибки в формате:
 - `409` - Конфликт (пользователь уже существует)
 - `500` - Внутренняя ошибка сервера
 
+### Управление JWT токенами
+**Рекомендации:**
+- Сохраняйте токен в `EncryptedSharedPreferences`
+- Проверяйте срок действия перед каждым запросом
+- Автоматически перенаправляйте на экран логина при получении 401
+- Реализуйте автоматический refresh через повторный логин
+
 ### Пагинация
 Все списочные endpoints поддерживают пагинацию:
 - Используйте `limit` и `offset` параметры
@@ -313,6 +378,7 @@ API возвращает ошибки в формате:
 - Кэшируйте публичные заметки локально
 - Обновляйте кэш при создании новых заметок
 - Учитывайте `expiresAt` при кэшировании
+- Инвалидируйте кэш при изменении профиля
 
 ---
 
@@ -320,55 +386,75 @@ API возвращает ошибки в формате:
 
 ### База данных
 - **PostgreSQL 16** с UTF-8 кодировкой
-- **HikariCP** connection pool
+- **HikariCP** connection pool для оптимальной производительности
 - **Exposed ORM** для типобезопасных запросов
 
 ### Безопасность
-- **JWT токены** с HMAC SHA-256
-- **Bcrypt** хэширование паролей
-- **CORS** настроен для разработки
+- **JWT токены** с HMAC SHA-256 подписью
+- **Bcrypt** хэширование паролей (cost factor 12)
+- **CORS** настроен для разработки и production
 - **SQL injection** защита через Exposed ORM
+- **Валидация** входных данных на всех endpoints
 
 ### Производительность
 - **Connection pooling** для оптимальной работы с БД
 - **Indexed queries** для быстрого поиска
 - **Пагинация** для больших списков
+- **Lazy loading** для связанных данных
 
 ---
 
-## 📋 Shared модуль
+## 📋 Shared модуль для Android интеграции
 
-Для упрощения интеграции с Android приложением создан shared модуль с общими моделями данных:
+Для упрощения интеграции с Android приложением создан shared модуль с общими моделями данных.
 
 ### Подключение в Android проекте
 ```kotlin
+// settings.gradle.kts
+include(":shared")
+project(":shared").projectDir = file("../Nimbin_back/shared")
+
 // build.gradle.kts (app module)
 implementation(project(":shared"))
 ```
 
 ### Основные модели
+Все DTO модели готовы к использованию с Kotlinx Serialization:
+
 ```kotlin
-// Уже готовы к использованию в Android
 @Serializable
-data class CreatePasteRequestDto(...)
+data class CreatePasteRequestDto(
+    val title: String,
+    val content: String,
+    val language: String = "text",
+    val visibility: PasteVisibility = PasteVisibility.PUBLIC,
+    val expiresAt: String? = null
+)
 
 @Serializable  
-data class LoginRequestDto(...)
+data class LoginRequestDto(
+    val email: String,    // ⚠️ Логин по email!
+    val password: String
+)
 
 @Serializable
-data class RegisterRequestDto(...)
+data class RegisterRequestDto(
+    val username: String,
+    val email: String,
+    val password: String
+)
 
 @Serializable
 data class UpdateProfileRequestDto(
-    val username: String?,
-    val displayName: String?
+    val username: String? = null,
+    val displayName: String? = null
 )
 
 @Serializable
 data class UserProfileDto(
     val user: UserDto,
     val publicPastesCount: Int,
-    val totalPastesCount: Int?
+    val totalPastesCount: Int? = null
 )
 
 enum class PasteVisibility { PUBLIC, UNLISTED, PRIVATE }
@@ -379,360 +465,45 @@ enum class PasteVisibility { PUBLIC, UNLISTED, PRIVATE }
 ## ✅ Чек-лист для Android разработчика
 
 ### Перед началом разработки:
-- [ ] Убедитесь, что backend запущен на `http://localhost:8080`
-- [ ] Проверьте доступность API: `GET /api/pastes/public`
+- [ ] Убедитесь, что backend доступен: `GET https://nimbin-back-1de949af6629.herokuapp.com/api/pastes/public`
 - [ ] Добавьте shared модуль в зависимости Android проекта
 - [ ] Настройте HTTP клиент (Retrofit/Ktor Client) с base URL
+- [ ] Реализуйте JWT токен менеджмент
 
 ### Основные функции для реализации:
 - [ ] Экран регистрации/логина с сохранением JWT токена
-- [ ] Список публичных заметок с пагинацией и отображением автора.
-- [ ] Создание новой заметки (с выбором видимости).
-- [ ] Просмотр заметки с инкрементом счетчика и отображением автора.
-- [ ] Профиль пользователя с его публичными заметками.
-- [ ] Список "Мои заметки" с фильтрацией по видимости.
-- [ ] Редактирование профиля (displayName и username).
+- [ ] Список публичных заметок с пагинацией и отображением автора
+- [ ] Создание новой заметки с выбором видимости
+- [ ] Просмотр заметки с инкрементом счетчика и отображением автора
+- [ ] Профиль пользователя с его публичными заметками
+- [ ] Список "Мои заметки" с фильтрацией по видимости
+- [ ] Редактирование профиля (displayName и username)
 
 ### Рекомендуемые библиотеки:
 - **Networking**: Retrofit + OkHttp или Ktor Client
-- **JSON**: Kotlinx Serialization (уже настроена в shared модуле)
+- **JSON**: Kotlinx Serialization (готова в shared модуле)
 - **Навигация**: Navigation Component + Deep links для профилей
 - **UI**: Jetpack Compose с Material Design
 - **Хранение токена**: EncryptedSharedPreferences
-
-**Backend полностью готов к работе! Начинайте разработку Android приложения! 🚀**
-
----
-
-# 📚 Nimbin API Documentation v2.0
-
-## 🔄 Обновления версии 2.0
-- ✅ Добавлена поддержка `displayName` для пользователей
-- ✅ Информация об авторе в заметках (`authorUsername`, `authorDisplayName`)
-- ✅ Профили пользователей и редактирование
-- ✅ Статистика пользователей
+- **Архитектура**: MVVM + Repository pattern
 
 ---
 
-## 🔐 Аутентификация
+## 📞 Поддержка и развертывание
 
-### POST /api/auth/register
-**Описание:** Регистрация нового пользователя
+### Production Environment
+- **URL**: `https://nimbin-back-1de949af6629.herokuapp.com`
+- **База данных**: PostgreSQL на Heroku
+- **Мониторинг**: Heroku metrics и логи
 
-**Request Body:**
-```json
-{
-    "username": "string",     // 3-50 символов, уникальный
-    "email": "string",        // Валидный email, уникальный  
-    "password": "string"      // 6+ символов
-}
+### Статус системы
+Для проверки работоспособности API используйте health check:
+```http
+GET /api/pastes/public
 ```
 
-**Response 201:**
-```json
-{
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "user": {
-        "id": "550e8400-e29b-41d4-a716-446655440000",
-        "username": "testuser",
-        "displayName": null,           // ✅ НОВОЕ поле
-        "email": "test@example.com",
-        "createdAt": "2025-08-20T10:30:00"
-    }
-}
-```
-
-### POST /api/auth/login
-**Описание:** Вход в систему
-
-**Request Body:**
-```json
-{
-    "username": "string",     // username или email
-    "password": "string"
-}
-```
-
-**Response 200:** Аналогично регистрации
+Если возвращается список заметок - система работает корректно.
 
 ---
 
-## 📝 Заметки (Pastes)
-
-### GET /api/pastes/public
-**Описание:** Получить публичные заметки с информацией об авторах
-
-**Query Parameters:**
-- `page` (int, default: 1) - номер страницы
-- `limit` (int, default: 20) - количество заметок на странице
-- `sort` (string, default: "newest") - сортировка:
-  - `newest` - новые сначала
-  - `oldest` - старые сначала  
-  - `most_viewed` - популярные сначала
-  - `least_viewed` - менее популярные сначала
-  - `title_asc` - по названию А-Я
-  - `title_desc` - по названию Я-А
-
-**Response 200:**
-```json
-[
-    {
-        "id": "abc123def456",
-        "title": "Моя заметка",
-        "content": "Содержимое заметки...",
-        "userId": "550e8400-e29b-41d4-a716-446655440000",
-        "authorUsername": "testuser",      // ✅ НОВОЕ - имя автора
-        "authorDisplayName": "Тест Юзер",  // ✅ НОВОЕ - отображаемое имя автора
-        "visibility": "PUBLIC",
-        "createdAt": "2025-08-20T10:30:00",
-        "expiresAt": null,
-        "language": "kotlin",
-        "viewCount": 42
-    }
-]
-```
-
-### POST /api/pastes
-**Описание:** Создать новую заметку
-
-**Headers:**
-- `Authorization: Bearer <token>` (опционально)
-
-**Request Body:**
-```json
-{
-    "title": "string",                    // 1-255 символов
-    "content": "string",                  // 1-1,000,000 символов
-    "visibility": "PUBLIC|UNLISTED|PRIVATE",  // default: PUBLIC
-    "language": "text",                   // default: text
-    "expiresAt": "2025-12-31T23:59:59"   // опционально
-}
-```
-
-**Response 201:** Объект заметки (как в GET /api/pastes/public)
-
-### GET /api/pastes/{id}
-**Описание:** Получить заметку по ID (инкремент просмотров). Возвращает заметку с информацией об авторе.
-
-**Headers:**
-- `Authorization: Bearer <token>` (опционально, для приватных заметок)
-
-**Response 200:** Объект заметки с информацией об авторе
-```json
-{
-    "id": "abc123def456",
-    "title": "Пример заметки",
-    "content": "Содержимое заметки...",
-    "userId": "user-uuid-123",
-    "authorUsername": "john_doe",
-    "authorDisplayName": "John Doe",
-    "visibility": "PUBLIC",
-    "createdAt": "2025-08-20T10:30:00",
-    "expiresAt": null,
-    "language": "kotlin",
-    "viewCount": 42
-}
-```
-
-**Примечания:**
-- Для анонимных заметок `userId`, `authorUsername` и `authorDisplayName` будут `null`
-- Счетчик просмотров автоматически увеличивается на 1 при каждом обращении
-- Доступ к заметкам проверяется по правилам видимости
-
-### GET /api/pastes/my
-**Описание:** Получить свои заметки
-
-**Headers:**
-- `Authorization: Bearer <token>` (обязательно)
-
-**Query Parameters:**
-- `page`, `limit` - аналогично публичным заметкам
-
-**Response 200:** Массив заметок
-
-### DELETE /api/pastes/{id}
-**Описание:** Удалить свою заметку
-
-**Headers:**
-- `Authorization: Bearer <token>` (обязательно)
-
-**Response 200:**
-```json
-{
-    "message": "Paste deleted successfully"
-}
-```
-
----
-
-## 👤 Пользователи и профили (✅ НОВОЕ)
-
-### GET /api/users/{id}
-**Описание:** Получить публичный профиль пользователя
-
-**Response 200:**
-```json
-{
-    "user": {
-        "id": "550e8400-e29b-41d4-a716-446655440000",
-        "username": "testuser",
-        "displayName": "Тест Юзер",
-        "email": "test@example.com",
-        "createdAt": "2025-08-20T10:30:00"
-    },
-    "publicPastesCount": 15,      // Количество публичных заметок
-    "totalPastesCount": null      // null для чужих профилей
-}
-```
-
-### GET /api/users/{id}/pastes
-**Описание:** Получить публичные заметки пользователя
-
-**Query Parameters:**
-- `page`, `limit` - стандартная пагинация
-
-**Response 200:** Массив заметок с информацией об авторе
-
-### GET /api/users/profile
-**Описание:** Получить свой профиль с полной статистикой
-
-**Headers:**
-- `Authorization: Bearer <token>` (обязательно)
-
-**Response 200:**
-```json
-{
-    "user": {
-        "id": "550e8400-e29b-41d4-a716-446655440000",
-        "username": "testuser", 
-        "displayName": "Тест Юзер",
-        "email": "test@example.com",
-        "createdAt": "2025-08-20T10:30:00"
-    },
-    "publicPastesCount": 15,      // Публичные заметки
-    "totalPastesCount": 23        // ✅ Полная статистика для владельца
-}
-```
-
-### PUT /api/users/profile
-**Описание:** Обновить свой профиль
-
-**Headers:**
-- `Authorization: Bearer <token>` (обязательно)
-
-**Request Body:**
-```json
-{
-    "username": "newusername",    // опционально, проверка на уникальность
-    "displayName": "Новое Имя"   // опционально, может быть null
-}
-```
-
-**Response 200:**
-```json
-{
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "username": "newusername",
-    "displayName": "Новое Имя", 
-    "email": "test@example.com",
-    "createdAt": "2025-08-20T10:30:00"
-}
-```
-
----
-
-## 🔧 Статус коды и обработка ошибок
-
-### Успешные ответы
-- `200 OK` - Операция выполнена успешно
-- `201 Created` - Ресурс создан (регистрация, создание заметки)
-
-### Ошибки клиента (4xx)
-- `400 Bad Request` - Неверные данные запроса
-- `401 Unauthorized` - Требуется авторизация
-- `403 Forbidden` - Доступ запрещен
-- `404 Not Found` - Ресурс не найден
-- `409 Conflict` - Конфликт данных (username уже существует)
-
-### Ошибки сервера (5xx)
-- `500 Internal Server Error` - Внутренняя ошибка сервера
-
-### Формат ошибок
-```json
-{
-    "error": "Описание ошибки",
-    "code": "ERROR_CODE"  // опционально
-}
-```
-
----
-
-## 📊 Лимиты и ограничения
-
-### Заметки
-- **Заголовок**: 1-255 символов
-- **Содержимое**: 1-1,000,000 символов (1MB)
-- **ID заметки**: 12 символов (a-zA-Z0-9, без путающих символов)
-- **Языки подсветки**: text, kotlin, java, javascript, python, cpp, и др.
-
-### Пользователи  
-- **Username**: 3-50 символов, уникальный
-- **DisplayName**: 0-100 символов, опционально
-- **Email**: стандартная валидация, уникальный
-- **Пароль**: минимум 6 символов
-
-### Пагинация
-- **Лимит**: максимум 100 заметок за запрос
-- **По умолчанию**: 20 заметок на страницу
-
----
-
-## 🌐 Конфигурация сервера
-
-### Базовые настройки
-- **Base URL**: `http://localhost:8080` (разработка)
-- **Content-Type**: `application/json; charset=utf-8`
-- **Кодировка**: UTF-8 (полная поддержка кириллицы)
-
-### JWT токены
-- **Заголовок**: `Authorization: Bearer <token>`
-- **Алгоритм**: HS256
-- **Время жизни**: настраивается на сервере
-
----
-
-## 📱 Примеры использования
-
-### Создание заметки с авторизацией
-```bash
-curl -X POST http://localhost:8080/api/pastes \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <token>" \
-  -d '{
-    "title": "Kotlin функция",
-    "content": "fun hello() = println(\"Hello World\")",
-    "visibility": "PUBLIC",
-    "language": "kotlin"
-  }'
-```
-
-### Просмотр профиля пользователя
-```bash
-curl -X GET http://localhost:8080/api/users/550e8400-e29b-41d4-a716-446655440000
-```
-
-### Обновление своего профиля
-```bash
-curl -X PUT http://localhost:8080/api/users/profile \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <token>" \
-  -d '{
-    "displayName": "Мое новое имя"
-  }'
-```
-
----
-
-**Версия API**: 2.0  
-**Дата обновления**: 20.08.2025  
-**Совместимость**: Обратно совместимо с v1.0
+*Документация актуализирована: 31 августа 2025*

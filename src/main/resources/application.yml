@@ -5,13 +5,13 @@ ktor:
   development: false
 
 jwt:
-  secret: ${?JWT_SECRET}
-  issuer: ${?JWT_ISSUER}
-  audience: ${?JWT_AUDIENCE}
-  realm: ${?JWT_REALM}
+  secret: ${?JWT_SECRET:"local-development-jwt-secret-key-change-in-production"}
+  issuer: ${?JWT_ISSUER:"http://localhost:8080/"}
+  audience: ${?JWT_AUDIENCE:"http://localhost:8080/api"}
+  realm: ${?JWT_REALM:"Access to 'api'"}
 
-database:
-  url: ${?DATABASE_URL}
-  driver: "org.postgresql.Driver"
-  user: ${?DB_USER}
-  password: ${?DB_PASSWORD}
+# Настройки для локальной разработки (игнорируются на Heroku при наличии DATABASE_URL)
+database.driver: "org.postgresql.Driver"
+database.url: "jdbc:postgresql://localhost:5432/nimbin_dev"
+database.user: "postgres"
+database.password: "postgres"

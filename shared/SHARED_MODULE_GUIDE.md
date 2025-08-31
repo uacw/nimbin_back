@@ -7,7 +7,7 @@ Shared модуль содержит общие DTO классы, констан
 ## Структура модуля
 
 ```
-shared/src/commonMain/kotlin/tech/nimbus/shared/
+shared/src/main/kotlin/tech/nimbus/shared/
 ├── dto/                     # Data Transfer Objects
 │   ├── PasteDto.kt         # Модель заметки
 │   ├── UserDto.kt          # Модель пользователя
@@ -35,8 +35,8 @@ data class PasteDto(
     val title: String,
     val content: String,
     val userId: String? = null,
-    val authorUsername: String? = null,      // ✅ НОВОЕ
-    val authorDisplayName: String? = null,   // ✅ НОВОЕ
+    val authorUsername: String? = null,      // ✅ НОВОЕ: Username автора
+    val authorDisplayName: String? = null,   // ✅ НОВОЕ: Отображаемое имя автора
     val visibility: PasteVisibility = PasteVisibility.PUBLIC,
     val createdAt: String,
     val expiresAt: String? = null,
@@ -49,12 +49,39 @@ data class PasteDto(
 - Backend: Конвертация из внутренних моделей в ответах API
 - Android: Отображение заметок в UI, кеширование
 
+**Особенности отображения автора в Android:**
+```kotlin
+// Рекомендуемая логика для UI
+fun displayAuthorName(paste: PasteDto): String {
+    return when {
+        paste.authorDisplayName != null -> paste.authorDisplayName
+        paste.authorUsername != null -> paste.authorUsername
+        else -> "Anonymous"
+    }
+}
+
+fun displayAuthorSecondary(paste: PasteDto): String? {
+    return if (paste.authorDisplayName != null) "@${paste.authorUsername}" else null
+}
+```
+
 ### PasteVisibility
 Enum для типов видимости заметок:
 
 - `PUBLIC` - Публичная заметка (отображается в общем списке)
 - `UNLISTED` - Скрытая заметка (доступна только по ссылке) 
 - `PRIVATE` - Приватная заметка (доступна только владельцу)
+
+**Использование в Android UI:**
+```kotlin
+fun getVisibilityIcon(visibility: PasteVisibility): ImageVector {
+    return when (visibility) {
+        PasteVisibility.PUBLIC -> Icons.Default.Public
+        PasteVisibility.UNLISTED -> Icons.Default.LinkOff
+        PasteVisibility.PRIVATE -> Icons.Default.Lock
+    }
+}
+```
 
 ### UserDto
 Модель пользователя для публичного API:
@@ -64,7 +91,7 @@ Enum для типов видимости заметок:
 data class UserDto(
     val id: String,
     val username: String,
-    val displayName: String? = null,         // ✅ НОВОЕ
+    val displayName: String? = null,         // ✅ НОВОЕ: Отображаемое имя
     val email: String,
     val createdAt: String
 )
@@ -72,23 +99,34 @@ data class UserDto(
 
 **Примечание:** Не содержит приватные данные (пароль, соль и т.д.)
 
-## Request/Response DTOs
+## Request DTOs
 
-### Запросы к API
-
-#### CreatePasteRequestDto
+### CreatePasteRequestDto
 ```kotlin
 @Serializable
 data class CreatePasteRequestDto(
     val title: String,
     val content: String,
     val visibility: PasteVisibility = PasteVisibility.PUBLIC,
-    val expiresAt: String? = null,
+    val expiresAt: String? = null,          // ISO timestamp или null
     val language: String = "text"
 )
 ```
 
-#### RegisterRequestDto
+**Валидация в Android:**
+```kotlin
+fun validateCreatePasteRequest(request: CreatePasteRequestDto): List<String> {
+    val errors = mutableListOf<String>()
+    
+    if (request.title.isBlank()) errors.add("Title cannot be empty")
+    if (request.title.length > 255) errors.add("Title too long (max 255 characters)")
+    if (request.content.isBlank()) errors.add("Content cannot be empty")
+    
+    return errors
+}
+```
+
+### RegisterRequestDto
 ```kotlin
 @Serializable
 data class RegisterRequestDto(
@@ -98,15 +136,19 @@ data class RegisterRequestDto(
 )
 ```
 
-#### LoginRequestDto
+### LoginRequestDto (⚠️ BREAKING CHANGE v2.1)
 ```kotlin
 @Serializable
 data class LoginRequestDto(
-    val username: String,    // Может быть username или email
+    val email: String,    // ✅ ИЗМЕНЕНО: теперь только email!
     val password: String
 )
+```
 
-/** ✅ НОВОЕ **/
+**Критическое изменение:** В версии 2.1 логин происходит только по email адресу, а не по username.
+
+### UpdateProfileRequestDto (✅ НОВОЕ в v2.1)
+```kotlin
 @Serializable
 data class UpdateProfileRequestDto(
     val username: String? = null,
@@ -114,220 +156,280 @@ data class UpdateProfileRequestDto(
 )
 ```
 
-### Ответы API
+**Использование:**
+- Оба поля опциональны - можно обновлять по отдельности
+- `null` значения игнорируются на сервере
+- Валидация происходит на backend
 
-#### AuthResponseDto
+## Response DTOs
+
+### AuthResponseDto
 ```kotlin
 @Serializable
 data class AuthResponseDto(
-    val token: String,       // JWT токен
-    val user: UserDto       // Информация о пользователе
+    val token: String,
+    val user: UserDto
 )
 ```
 
-#### ApiErrorDto
+**Использование в Android:**
 ```kotlin
-@Serializable
-data class ApiErrorDto(
-    val error: String,
-    val code: String? = null
-)
+// После успешной аутентификации
+fun handleAuthSuccess(response: AuthResponseDto) {
+    tokenManager.saveToken(response.token)
+    userManager.saveUser(response.user)
+    navigateToMainScreen()
+}
+```
 
-/** ✅ НОВОЕ **/
+### UserProfileDto (✅ НОВОЕ в v2.1)
+```kotlin
 @Serializable
 data class UserProfileDto(
     val user: UserDto,
     val publicPastesCount: Int,
-    val totalPastesCount: Int? = null
+    val totalPastesCount: Int? = null    // null для чужих профилей
 )
 ```
 
-## API клиент и константы
+**Особенности:**
+- `totalPastesCount` доступен только для собственного профиля
+- Для чужих профилей всегда `null` по соображениям приватности
 
-### ApiEndpoints
-Объект с константами всех API endpoints:
-
+### ApiErrorDto
 ```kotlin
-object ApiEndpoints {
-    const val API_BASE = "/api"
-    const val PASTES = "/api/pastes"
-    // ...
-    const val LOGIN = "/api/auth/login"
-    
-    // ✅ НОВЫЕ User endpoints
-    const val USER_BASE = "$API_BASE/users"
-    const val USER_PROFILE = "$USER_BASE/profile"      // GET (свой), PUT (обновить)
-    const val USER_BY_ID = "$USER_BASE/{id}"           // GET (чужой)
-    const val USER_PUBLIC_PASTES = "$USER_BASE/{id}/pastes" // GET (заметки чужого)
-    
-    // Helper методы
-    fun pasteById(id: String): String
-    fun publicPastes(page: Int, limit: Int): String
-    fun userPastes(page: Int, limit: Int): String
-
-    // ✅ НОВЫЕ Helper методы
-    fun userProfileById(userId: String): String
-    fun userPublicPastes(userId: String, page: Int, limit: Int): String
-}
+@Serializable
+data class ApiErrorDto(
+    val error: String
+)
 ```
 
-### NimbinApiClient (Интерфейс)
-Определяет контракт API клиента для реализации на каждой платформе:
+## API Client Interface
 
-**Основные методы:**
-- `createPaste(request)` - Создание заметки
-- `getPaste(id)` - Получение заметки по ID
-- `getPublicPastes(page, limit)` - Публичные заметки
-- `getUserPastes(token, page, limit)` - Заметки пользователя
-- `deletePaste(token, id)` - Удаление заметки
-- `register(request)` - Регистрация
-- `login(request)` - Вход
-- `getCurrentUser(token)` - Текущий пользователь
+### NimbinApiClient
+Интерфейс для реализации API клиента:
 
-// ✅ НОВЫЕ методы
-- `getUserProfile(userId)` - Получить профиль пользователя
-- `updateProfile(token, request)` - Обновить свой профиль
-- `getUserPublicPastes(userId, page, limit)` - Публичные заметки пользователя
+```kotlin
+interface NimbinApiClient {
+    suspend fun login(request: LoginRequestDto): ApiResult<AuthResponseDto>
+    suspend fun register(request: RegisterRequestDto): ApiResult<AuthResponseDto>
+    suspend fun createPaste(request: CreatePasteRequestDto, token: String?): ApiResult<PasteDto>
+    suspend fun getPaste(id: String, token: String?): ApiResult<PasteDto>
+    suspend fun getPublicPastes(limit: Int, offset: Int): ApiResult<List<PasteDto>>
+    suspend fun getMyPastes(token: String, visibility: String?): ApiResult<List<PasteDto>>
+    suspend fun getUserProfile(token: String): ApiResult<UserProfileDto>
+    suspend fun updateProfile(request: UpdateProfileRequestDto, token: String): ApiResult<UserDto>
+}
 ```
 
 ## Утилиты
 
-### ApiResult<T>
-Sealed class для безопасной обработки результатов API:
+### ApiResult
+Sealed class для типобезопасной обработки результатов API:
 
 ```kotlin
 sealed class ApiResult<out T> {
     data class Success<T>(val data: T) : ApiResult<T>()
-    data class Error(val message: String, val code: Int? = null) : ApiResult<Nothing>()
-    
-    // Helper методы
-    fun getOrNull(): T?
-    fun getOrDefault(defaultValue: T): T
-    fun onSuccess(action: (T) -> Unit): ApiResult<T>
-    fun onError(action: (String, Int?) -> Unit): ApiResult<T>
+    data class Error(val message: String) : ApiResult<Nothing>()
 }
 ```
 
 **Использование в Android:**
 ```kotlin
-when (val result = apiClient.getPaste(id)) {
-    is ApiResult.Success -> showPaste(result.data)
-    is ApiResult.Error -> showError(result.message)
+when (val result = apiClient.createPaste(request, token)) {
+    is ApiResult.Success -> {
+        // Успешное создание заметки
+        val paste = result.data
+        updateUI(paste)
+    }
+    is ApiResult.Error -> {
+        // Обработка ошибки
+        showError(result.message)
+    }
 }
 ```
 
 ### ValidationUtils
-Константы и методы для валидации данных:
+Утилиты для валидации данных на клиенте:
 
-**Константы:**
-- `MIN_TITLE_LENGTH = 1`, `MAX_TITLE_LENGTH = 255`
-- `MIN_CONTENT_LENGTH = 1`, `MAX_CONTENT_LENGTH = 1_000_000`
-- `PASTE_ID_LENGTH = 12`
-- `MIN_USERNAME_LENGTH = 3`, `MAX_USERNAME_LENGTH = 50`
-- `MIN_PASSWORD_LENGTH = 6`, `MAX_PASSWORD_LENGTH = 128`
-- `SUPPORTED_LANGUAGES` - Set поддерживаемых языков
-
-**Методы валидации:**
-- `isValidTitle(title: String): Boolean`
-- `isValidContent(content: String): Boolean`
-- `isValidPasteId(id: String): Boolean`
-- `isValidUsername(username: String): Boolean`
-- `isValidEmail(email: String): Boolean`
-- `isValidPassword(password: String): Boolean`
+```kotlin
+object ValidationUtils {
+    fun isValidEmail(email: String): Boolean
+    fun isValidUsername(username: String): Boolean
+    fun isValidPassword(password: String): Boolean
+}
 ```
 
-## Подключение в проектах
+## Интеграция с Android
 
-### Backend (build.gradle.kts)
+### 1. Настройка зависимостей
 ```kotlin
+// build.gradle.kts (app module)
 dependencies {
     implementation(project(":shared"))
-    // ... другие зависимости
+    
+    // Ktor Client для HTTP запросов
+    implementation("io.ktor:ktor-client-android:2.3.12")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
+    
+    // Для JWT токен менеджмента
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 }
 ```
 
-### Android (build.gradle)
+### 2. Реализация API клиента
 ```kotlin
-dependencies {
-    implementation project(':shared')
-    // ... другие зависимости
+class AndroidNimbinApiClient(
+    private val httpClient: HttpClient,
+    private val baseUrl: String = "https://nimbin-back-1de949af6629.herokuapp.com"
+) : NimbinApiClient {
+    
+    override suspend fun createPaste(
+        request: CreatePasteRequestDto,
+        token: String?
+    ): ApiResult<PasteDto> {
+        return try {
+            val response = httpClient.post("$baseUrl/api/pastes") {
+                contentType(ContentType.Application.Json)
+                setBody(request)
+                token?.let { headers { append("Authorization", "Bearer $it") } }
+            }
+            ApiResult.Success(response.body<PasteDto>())
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Unknown error")
+        }
+    }
 }
 ```
 
-## Принципы использования
-
-### 1. Типобезопасность
-Все DTO используют строгую типизацию и kotlinx.serialization
-
-### 2. Неизменяемость
-Все DTO классы являются data классами с immutable свойствами
-
-### 3. Документированность
-Каждый класс и важные свойства имеют KDoc комментарии
-
-### 4. Валидация
-Используйте ValidationUtils для проверки данных перед отправкой запросов
-
-### 5. Обработка ошибок
-Всегда используйте ApiResult для обработки результатов API операций
-
-## Примеры использования в Android
-
-### Создание заметки
+### 3. Repository Pattern
 ```kotlin
-val request = CreatePasteRequestDto(
-    title = "My Note",
-    content = "Hello World",
-    visibility = PasteVisibility.PUBLIC,
-    language = "kotlin"
+class PasteRepository(
+    private val apiClient: NimbinApiClient,
+    private val tokenManager: TokenManager
+) {
+    
+    suspend fun createPaste(
+        title: String,
+        content: String,
+        visibility: PasteVisibility
+    ): Result<PasteDto> {
+        val request = CreatePasteRequestDto(
+            title = title,
+            content = content,
+            visibility = visibility
+        )
+        
+        return when (val result = apiClient.createPaste(request, tokenManager.getToken())) {
+            is ApiResult.Success -> Result.success(result.data)
+            is ApiResult.Error -> Result.failure(Exception(result.message))
+        }
+    }
+}
+```
+
+### 4. ViewModel интеграция
+```kotlin
+class CreatePasteViewModel(
+    private val pasteRepository: PasteRepository
+) : ViewModel() {
+    
+    private val _uiState = MutableStateFlow(CreatePasteUiState())
+    val uiState: StateFlow<CreatePasteUiState> = _uiState.asStateFlow()
+    
+    fun createPaste() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            
+            pasteRepository.createPaste(
+                title = _uiState.value.title,
+                content = _uiState.value.content,
+                visibility = _uiState.value.selectedVisibility
+            ).fold(
+                onSuccess = { paste ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isSuccess = true
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = error.message
+                    )
+                }
+            )
+        }
+    }
+}
+```
+
+## Миграция между версиями
+
+### v2.0 → v2.1
+**Критические изменения:**
+
+1. **LoginRequestDto изменен:**
+   ```kotlin
+   // Старая версия
+   LoginRequestDto(username = "user@example.com", password = "pass")
+   
+   // Новая версия
+   LoginRequestDto(email = "user@example.com", password = "pass")
+   ```
+
+2. **Новые DTO:**
+   - `UpdateProfileRequestDto` - для обновления профиля
+   - `UserProfileDto` - расширенная информация профиля
+
+3. **Обновленный PasteDto:**
+   - Добавлены поля `authorUsername` и `authorDisplayName`
+
+## Best Practices
+
+### Обработка ошибок
+```kotlin
+// Централизованная обработка ошибок API
+fun handleApiError(error: String): String {
+    return when {
+        error.contains("Token is not valid") -> "Session expired. Please login again."
+        error.contains("User not found") -> "User not found"
+        error.contains("Paste not found") -> "Paste not found"
+        else -> error
+    }
+}
+```
+
+### Кеширование
+```kotlin
+// Кеширование заметок с учетом TTL
+@Entity
+data class CachedPaste(
+    @PrimaryKey val id: String,
+    val data: String, // JSON serialized PasteDto
+    val cachedAt: Long,
+    val ttl: Long = 5 * 60 * 1000L // 5 минут
 )
-
-// ...
 ```
 
-### Аутентификация
+### Безопасность токенов
 ```kotlin
-val loginRequest = LoginRequestDto("username", "password")
-val result = apiClient.login(loginRequest)
-
-result.onSuccess { authResponse ->
-    // Сохранить токен: authResponse.token
-    // Получить пользователя: authResponse.user
-}.onError { error, code ->
-    // Показать ошибку входа
+// Использование EncryptedSharedPreferences для токенов
+class SecureTokenManager(private val context: Context) {
+    private val sharedPrefs = EncryptedSharedPreferences.create(
+        "auth_tokens",
+        MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC),
+        context,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
+    
+    fun saveToken(token: String) {
+        sharedPrefs.edit().putString("jwt_token", token).apply()
+    }
 }
 ```
-
-### Загрузка заметок
-```kotlin
-// Публичные заметки
-val publicResult = apiClient.getPublicPastes(page = 1, limit = 20)
-
-// Заметки пользователя (требует токен)  
-val userResult = apiClient.getUserPastes(token, page = 1, limit = 20)
-
-// ✅ НОВЫЙ пример: Публичные заметки другого пользователя
-val otherUserPastes = apiClient.getUserPublicPastes(userId = "some-user-id")
-```
-
-## Версионирование
-
-При внесении изменений в shared модель:
-
-1. **Breaking changes** - увеличить major версию
-2. **Новые поля** - добавлять с default значениями
-3. **Удаление полей** - помечать @Deprecated перед удалением
-
-## Рекомендации
-
-1. **Валидация на клиенте** - используйте ValidationUtils перед отправкой
-2. **Обработка ошибок** - всегда обрабатывайте ApiResult.Error
-3. **Кэширование** - DTO можно безопасно сериализовать для кеша
-4. **Тестирование** - создавайте mock данные используя DTO из shared модуля
-5. **Отображение автора** - используйте `authorDisplayName` или `authorUsername` из `PasteDto`
 
 ---
-
-**Версия:** 2.0  
-**Последнее обновление:** 20.08.2025  
-**Совместимость:** Backend v2.0, Android TBD
+*Обновлено: 31 августа 2025*

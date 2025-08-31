@@ -14,8 +14,8 @@ fun Application.configureDatabases() {
     // Приоритет для переменной окружения Heroku
     val databaseUrl = System.getenv("DATABASE_URL")
 
-    val hikariConfig = if (databaseUrl != null) {
-        // Конфигурация для Heroku
+    val hikariConfig = if (!databaseUrl.isNullOrBlank()) {
+        // Конфигурация для Heroku (производственная среда)
         val dbUri = URI(databaseUrl)
         val username = dbUri.userInfo.split(":")[0]
         val password = dbUri.userInfo.split(":")[1]
@@ -28,12 +28,12 @@ fun Application.configureDatabases() {
             driverClassName = "org.postgresql.Driver"
         }
     } else {
-        // Конфигурация для локальной разработки из application.yml
+        // Конфигурация для локальной разработки - используем дефолтные значения
         HikariConfig().apply {
-            driverClassName = environment.config.property("database.driver").getString()
-            jdbcUrl = environment.config.property("database.url").getString()
-            username = environment.config.property("database.user").getString()
-            password = environment.config.property("database.password").getString()
+            driverClassName = "org.postgresql.Driver"
+            jdbcUrl = "jdbc:postgresql://localhost:5432/nimbin_dev"
+            username = "postgres"
+            password = "postgres"
         }
     }
 
