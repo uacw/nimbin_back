@@ -37,7 +37,7 @@ data class PasteResponse(
     val visibility: PasteVisibility = PasteVisibility.PUBLIC,
     val createdAt: String,
     val expiresAt: String? = null,
-    val language: String = "text",
+    val syntaxLanguage: String = "plaintext",
     val viewCount: Int = 0,
     val author: AuthorInfo? = null  // null для анонимных заметок
 ) {
@@ -53,7 +53,7 @@ data class PasteResponse(
                 visibility = paste.visibility,
                 createdAt = paste.createdAt,
                 expiresAt = paste.expiresAt,
-                language = paste.language,
+                syntaxLanguage = paste.syntaxLanguage,
                 viewCount = paste.viewCount,
                 author = null
             )
@@ -70,7 +70,7 @@ data class PasteResponse(
                 visibility = paste.visibility,
                 createdAt = paste.createdAt,
                 expiresAt = paste.expiresAt,
-                language = paste.language,
+                syntaxLanguage = paste.syntaxLanguage,
                 viewCount = paste.viewCount,
                 author = AuthorInfo(
                     id = author.id,

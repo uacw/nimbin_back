@@ -31,7 +31,7 @@ object DtoConverters {
             visibility = this.visibility.toSharedVisibility(),
             createdAt = this.createdAt,
             expiresAt = this.expiresAt,
-            language = this.language,
+            syntaxLanguage = this.syntaxLanguage,
             viewCount = this.viewCount
         )
     }
@@ -50,7 +50,7 @@ object DtoConverters {
             visibility = this.visibility.toSharedVisibility(),
             createdAt = this.createdAt,
             expiresAt = this.expiresAt,
-            language = this.language,
+            syntaxLanguage = this.syntaxLanguage,
             viewCount = this.viewCount
         )
     }
@@ -71,15 +71,15 @@ object DtoConverters {
     /**
      * Конвертирует CreatePasteRequestDto из shared модуля во внутреннюю модель.
      */
-    fun CreatePasteRequestDto.toCreatePasteRequest(): CreatePasteRequest {
-        return CreatePasteRequest(
-            title = this.title,
-            content = this.content,
-            visibility = this.visibility.toInternalVisibility(),
-            expiresAt = this.expiresAt,
-            language = this.language
-        )
-    }
+//    fun CreatePasteRequestDto.toCreatePasteRequest(): CreatePasteRequest {
+//        return CreatePasteRequest(
+//            title = this.title,
+//            content = this.content,
+//            visibility = this.visibility.toInternalVisibility(),
+//            expiresAt = this.expiresAt,
+//            language = this.language
+//        )
+//    }
 
     /**
      * Конвертирует внутренний enum PasteVisibility в shared enum.

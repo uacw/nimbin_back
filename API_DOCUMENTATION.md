@@ -21,18 +21,7 @@ API использует JWT токены для аутентификации. �
 Authorization: Bearer <jwt_token>
 ```
 
-**🚀 Статус разработки (31.08.2025):**
-- ✅ **Backend API полностью реализован и протестирован**
-- ✅ **PostgreSQL база данных настроена и работает**
-- ✅ **JWT аутентификация исправлена и полностью функциональна**
-- ✅ **Пользовательские профили с displayName и username**
-- ✅ **Фильтрация и сортировка заметок**
-- ✅ **Unit тесты покрывают основной функционал (87% покрытие)**
-- ✅ **Shared модуль для Android интеграции**
-- ✅ **Кириллица и UTF-8 поддерживаются корректно**
-- ✅ **Развернуто на Heroku и готово к использованию**
-
-**🎯 Готово к интеграции с Android приложением! 🎉**
+Строго: логин по email, не по username.
 
 ---
 
@@ -224,7 +213,7 @@ Authorization: Bearer <jwt_token>  # Опционально для PUBLIC/UNLIST
 {
     "title": "Название заметки",
     "content": "Содержимое заметки с поддержкой кириллицы",
-    "language": "kotlin",
+    "syntaxLanguage": "kotlin",
     "visibility": "PUBLIC",  # PUBLIC, UNLISTED, PRIVATE
     "expiresAt": "2025-12-31T23:59:59"  # Опционально
 }
@@ -247,7 +236,7 @@ Authorization: Bearer <jwt_token>  # Опционально для PUBLIC/UNLIST
     "visibility": "PUBLIC",
     "createdAt": "2025-08-25T10:30:00",
     "expiresAt": null,
-    "language": "kotlin",
+    "syntaxLanguage": "kotlin",
     "viewCount": 0
 }
 ```
@@ -270,7 +259,7 @@ Authorization: Bearer <jwt_token>  # Для приватных заметок
     "visibility": "PUBLIC",
     "createdAt": "2025-08-25T10:30:00",
     "expiresAt": null,
-    "language": "kotlin",
+    "syntaxLanguage": "kotlin",
     "viewCount": 42
 }
 ```
@@ -426,7 +415,7 @@ implementation(project(":shared"))
 data class CreatePasteRequestDto(
     val title: String,
     val content: String,
-    val language: String = "text",
+    val syntaxLanguage: String = "plaintext",
     val visibility: PasteVisibility = PasteVisibility.PUBLIC,
     val expiresAt: String? = null
 )
@@ -506,4 +495,4 @@ GET /api/pastes/public
 
 ---
 
-*Документация актуализирована: 31 августа 2025*
+*Документация актуализирована: 08 сентября 2025*

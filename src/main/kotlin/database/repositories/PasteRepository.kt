@@ -58,7 +58,7 @@ class PasteRepository : IPasteRepository {
             it[visibility] = paste.visibility
             it[createdAt]  = LocalDateTime.parse(paste.createdAt)
             it[expiresAt]  = paste.expiresAt?.let(LocalDateTime::parse)
-            it[language]   = paste.language
+            it[syntaxLanguage]   = paste.syntaxLanguage
             it[viewCount]  = 0
         } get PasteTable.id
 
@@ -318,7 +318,7 @@ class PasteRepository : IPasteRepository {
 
 
     /**
-     * Вспомогательный метод для маппинга ResultRow в об��ект Paste.
+     * Вспомогательный метод для маппинга ResultRow в объект Paste.
      */
     private fun mapRowToPaste(row: ResultRow): Paste {
         return Paste(
@@ -329,7 +329,7 @@ class PasteRepository : IPasteRepository {
             visibility = row[PasteTable.visibility],
             createdAt = row[PasteTable.createdAt].toString(),
             expiresAt = row[PasteTable.expiresAt]?.toString(),
-            language = row[PasteTable.language],
+            syntaxLanguage = row[PasteTable.syntaxLanguage],
             viewCount = row[PasteTable.viewCount]
         )
     }

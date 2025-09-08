@@ -55,7 +55,7 @@ class PasteVisibilityRepositoryTest {
             visibility = visibility,
             createdAt = LocalDateTime.now().toString(),
             expiresAt = null,
-            language = "text",
+            syntaxLanguage = "plaintext",
             viewCount = 0
         )
     }

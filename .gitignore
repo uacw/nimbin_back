@@ -40,3 +40,6 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+# Private docs (do not publish)
+GEM_BOT_INSTRUCTION.md

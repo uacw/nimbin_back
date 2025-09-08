@@ -52,7 +52,7 @@ class PasteRepositoryTest {
         content: String = "Test content",
         userId: String? = "user123",
         visibility: PasteVisibility = PasteVisibility.PUBLIC,
-        language: String = "text"
+        syntaxLanguage: String = "plaintext"
     ): Paste {
         return Paste(
             id = id,
@@ -62,7 +62,7 @@ class PasteRepositoryTest {
             visibility = visibility,
             createdAt = LocalDateTime.now().toString(),
             expiresAt = null,
-            language = language,
+            syntaxLanguage = syntaxLanguage,
             viewCount = 0
         )
     }
@@ -82,7 +82,7 @@ class PasteRepositoryTest {
         assertEquals(paste.content, created.content)
         assertEquals(paste.userId, created.userId)
         assertEquals(paste.visibility, created.visibility)
-        assertEquals(paste.language, created.language)
+        assertEquals(paste.syntaxLanguage, created.syntaxLanguage)
         assertEquals(0, created.viewCount) // viewCount должен быть сброшен в 0
     }
 
@@ -321,7 +321,7 @@ class PasteRepositoryTest {
             id = "unicode",
             title = "Заголовок на русском 测试",
             content = "Содержимое с эмодзи 🚀 и разными языками: English, Русский, 中文",
-            language = "текст"
+            syntaxLanguage = "plaintext"
         )
 
         // When
@@ -333,7 +333,7 @@ class PasteRepositoryTest {
         assertNotNull(found)
         assertEquals(paste.title, found.title)
         assertEquals(paste.content, found.content)
-        assertEquals(paste.language, found.language)
+        assertEquals(paste.syntaxLanguage, found.syntaxLanguage)
     }
 
     @Test

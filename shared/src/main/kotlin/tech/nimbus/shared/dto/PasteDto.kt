@@ -31,6 +31,6 @@ data class PasteDto(
     val visibility: PasteVisibility = PasteVisibility.PUBLIC,
     val createdAt: String,
     val expiresAt: String? = null,
-    val language: String = "text",
+    val syntaxLanguage: String = "plaintext",
     val viewCount: Int = 0
 )

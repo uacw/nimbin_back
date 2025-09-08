@@ -18,7 +18,7 @@ data class CreatePasteRequestDto(
     val content: String,
     val visibility: PasteVisibility = PasteVisibility.PUBLIC,
     val expiresAt: String? = null,
-    val language: String = "text"
+    val syntaxLanguage: String = "plaintext"
 )
 
 /**

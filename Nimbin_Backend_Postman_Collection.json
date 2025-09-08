@@ -2,9 +2,24 @@
 	"info": {
 		"_postman_id": "nimbin-backend-api",
 		"name": "Nimbin Backend API",
-		"description": "Полная коллекция тестов для Nimbin Backend API - Pastebin клон на Kotlin/Ktor",
+		"description": "Полная коллекция тестов для Nimbin Backend API - Pastebin клон на Kotlin/Ktor.\n\nПереключение окружений: установите переменную коллекции run_env = 'local' или 'heroku'. Скрипт коллекции автоматически подставит {{base_url}}.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"const env = (pm.collectionVariables.get('run_env') || 'local').toLowerCase();",
+					"const local = pm.collectionVariables.get('local_url') || 'http://localhost:8080';",
+					"const heroku = pm.collectionVariables.get('heroku_url') || pm.collectionVariables.get('base_url') || 'https://nimbin-back-1de949af6629.herokuapp.com';",
+					"const chosen = env === 'local' ? local : heroku;",
+					"pm.variables.set('base_url', chosen);"
+				]
+			}
+		}
+	],
 	"item": [
 		{
 			"name": "🔑 Аутентификация",
@@ -243,7 +258,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"title\": \"Тестовая заметка с кириллицей\",\n    \"content\": \"Привет мир! Это тестовая заметка на русском языке.\\nПоддерживаются переносы строк и специальные символы: àáâãäåæç\",\n    \"language\": \"text\",\n    \"visibility\": \"PUBLIC\"\n}"
+							"raw": "{\n    \"title\": \"Тестовая заметка с кириллицей\",\n    \"content\": \"Привет мир! Это тестовая заметка на русском языке.\\nПоддерживаются переносы строк и специальные символы: àáâãäåæç\",\n    \"syntaxLanguage\": \"plaintext\",\n    \"visibility\": \"PUBLIC\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/pastes",
@@ -275,7 +290,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"title\": \"Приватная заметка\",\n    \"content\": \"Это приватная заметка, видна только мне\",\n    \"language\": \"kotlin\",\n    \"visibility\": \"PRIVATE\"\n}"
+							"raw": "{\n    \"title\": \"Приватная заметка\",\n    \"content\": \"Это приватная заметка, видна только мне\",\n    \"syntaxLanguage\": \"kotlin\",\n    \"visibility\": \"PRIVATE\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/pastes",
@@ -307,7 +322,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"title\": \"Временная заметка\",\n    \"content\": \"fun main() {\\n    println(\\\"Hello Kotlin!\\\")\\n}\",\n    \"language\": \"kotlin\",\n    \"visibility\": \"UNLISTED\",\n    \"expiresAt\": \"2025-12-31T23:59:59\"\n}"
+							"raw": "{\n    \"title\": \"Временная заметка\",\n    \"content\": \"fun main() {\\n    println(\\\"Hello Kotlin!\\\")\\n}\",\n    \"syntaxLanguage\": \"kotlin\",\n    \"visibility\": \"UNLISTED\",\n    \"expiresAt\": \"2025-12-31T23:59:59\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/pastes",
@@ -335,7 +350,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"title\": \"Анонимная заметка\",\n    \"content\": \"Эта заметка создана без аутентификации\",\n    \"language\": \"text\",\n    \"visibility\": \"PUBLIC\"\n}"
+							"raw": "{\n    \"title\": \"Анонимная заметка\",\n    \"content\": \"Эта заметка создана без аутентификации\",\n    \"syntaxLanguage\": \"plaintext\",\n    \"visibility\": \"PUBLIC\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/pastes",
@@ -656,7 +671,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"title\": \"Заметка на русском языке\",\n    \"content\": \"Привет мир! 🚀\\n\\nЭто тестовая заметка с русским текстом.\\n\\nПоддерживаются:\\n- Кириллица: абвгдеёжзийклмнопрстуфхцчшщъыьэюя\\n- Эмодзи: 😀😁😂🤣😃😄😅😆😉\\n- Специальные символы: @#$%^&*()\\n\\nfun main() {\\n    println(\\\"Привет из Kotlin!\\\")\\n}\",\n    \"language\": \"kotlin\",\n    \"visibility\": \"PUBLIC\"\n}"
+							"raw": "{\n    \"title\": \"Заметка на русском языке\",\n    \"content\": \"Привет мир! 🚀\\n\\nЭто тестовая заметка с русским текстом.\\n\\nПоддерживаются:\\n- Кириллица: абвгдеёжзийклмнопрстуфхцчшщъыьэюя\\n- Эмодзи: 😀😁😂🤣😃😄😅😆😉\\n- Специальные символы: @#$%^&*()\\n\\nfun main() {\\n    println(\\\"Привет из Kotlin!\\\")\\n}\",\n    \"syntaxLanguage\": \"kotlin\",\n    \"visibility\": \"PUBLIC\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/pastes",
@@ -702,18 +717,46 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "🧰 Утилиты",
+			"item": [
+				{
+					"name": "Список языков подсветки",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/utils/syntax-languages",
+							"host": ["{{base_url}}"],
+							"path": ["api", "utils", "syntax-languages"]
+						}
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"variable": [
 		{
-			"key": "base_url",
-			"value": "https://nimbin-back-1de949af6629.herokuapp.com",
-			"description": "Base URL для Heroku deployment"
+			"key": "run_env",
+			"value": "local",
+			"description": "Выбор окружения: local или heroku"
 		},
 		{
 			"key": "local_url",
 			"value": "http://localhost:8080",
 			"description": "Base URL для локальной разработки"
+		},
+		{
+			"key": "heroku_url",
+			"value": "https://nimbin-back-1de949af6629.herokuapp.com",
+			"description": "Base URL для Heroku deployment"
+		},
+		{
+			"key": "base_url",
+			"value": "https://nimbin-back-1de949af6629.herokuapp.com",
+			"description": "АКТИВНЫЙ Base URL (подставляется скриптом в зависимости от run_env)"
 		},
 		{
 			"key": "jwt_token",

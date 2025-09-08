@@ -61,7 +61,7 @@ class PasteServiceTest {
                 userId = "user1",
                 visibility = PasteVisibility.PUBLIC,
                 createdAt = LocalDateTime.now().toString(),
-                language = "kotlin"
+                syntaxLanguage = "kotlin"
             )
 
             val pasteWithAuthor = PasteWithAuthor(testPaste, testUser)
@@ -129,7 +129,7 @@ class PasteServiceTest {
                 userId = "user1",
                 visibility = PasteVisibility.PUBLIC,
                 createdAt = LocalDateTime.now().toString(),
-                language = "text"
+                syntaxLanguage = "plaintext"
             )
 
             val pasteWithAuthor = PasteWithAuthor(testPaste, null)
@@ -147,6 +147,7 @@ class PasteServiceTest {
             // Assert
             assertEquals("validPaste12", result?.id)
             assertEquals("Test Paste", result?.title)
+            assertEquals("plaintext", result?.syntaxLanguage)
 
             verify(mockRepository).canAccessPaste("validPaste12", "user1")
             verify(mockRepository).getPasteWithAuthor("validPaste12")
@@ -205,7 +206,7 @@ class PasteServiceTest {
                 title = "Valid Title",
                 content = "Valid content here",
                 visibility = SharedPasteVisibility.PUBLIC,
-                language = "kotlin"
+                syntaxLanguage = "kotlin"
             )
 
             val createdPaste = Paste(
@@ -215,7 +216,7 @@ class PasteServiceTest {
                 userId = "user1",
                 visibility = PasteVisibility.PUBLIC,
                 createdAt = LocalDateTime.now().toString(),
-                language = "kotlin"
+                syntaxLanguage = "kotlin"
             )
 
             val pasteWithAuthor = PasteWithAuthor(createdPaste, null)
@@ -245,7 +246,7 @@ class PasteServiceTest {
                 title = "",
                 content = "Content",
                 visibility = SharedPasteVisibility.PUBLIC,
-                language = "text"
+                syntaxLanguage = "plaintext"
             )
 
             // Act & Assert
@@ -262,7 +263,7 @@ class PasteServiceTest {
                 title = "Private Paste",
                 content = "Secret content",
                 visibility = SharedPasteVisibility.PRIVATE,
-                language = "text"
+                syntaxLanguage = "plaintext"
             )
 
             // Act & Assert
@@ -279,7 +280,7 @@ class PasteServiceTest {
                 title = "Title",
                 content = "Content",
                 visibility = SharedPasteVisibility.PUBLIC,
-                language = "text"
+                syntaxLanguage = "plaintext"
             )
 
             whenever(mockRepository.createPaste(any()))

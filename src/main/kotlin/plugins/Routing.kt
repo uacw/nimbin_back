@@ -8,6 +8,7 @@ import tech.nimbus.routes.userRoutes
 import tech.nimbus.services.JwtService
 import tech.nimbus.database.repositories.UserRepository
 import tech.nimbus.database.repositories.PasteRepository
+import tech.nimbus.routes.utils.syntaxLanguagesRoute
 
 fun Application.configureRouting() {
     // Получаем переменные окружения для Heroku
@@ -32,5 +33,6 @@ fun Application.configureRouting() {
         authRoutes(jwtService, userRepo)
         userRoutes(userRepo, pasteRepo)
         // healthRoutes() и т.д.
+        syntaxLanguagesRoute()
     }
 }

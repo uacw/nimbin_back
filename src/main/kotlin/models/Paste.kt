@@ -29,6 +29,6 @@ data class Paste(
     val visibility: PasteVisibility = PasteVisibility.PUBLIC,
     val createdAt: String,             // ISO-строка
     val expiresAt: String? = null,
-    val language: String = "text",
+    val syntaxLanguage: String = "text",
     val viewCount: Int = 0
 )

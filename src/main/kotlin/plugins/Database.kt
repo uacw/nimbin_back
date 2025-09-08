@@ -49,8 +49,58 @@ fun Application.configureDatabases() {
     val dataSource = HikariDataSource(hikariConfig)
     Database.connect(dataSource)
 
-    // Автоматически создаём/обновляем таблицы при старте
+    // Авто-миграции и создание недостающих таблиц/колонок
     transaction {
-        SchemaUtils.create(UserTable, PasteTable)
+        // Хелпер: проверка наличия колонки в таблице через INFORMATION_SCHEMA (кросс-СУБД)
+        fun columnExists(table: String, column: String): Boolean {
+            val sql = """
+                SELECT 1
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE UPPER(TABLE_NAME) = UPPER('$table')
+                  AND UPPER(COLUMN_NAME) = UPPER('$column')
+                LIMIT 1
+            """.trimIndent()
+            return try {
+                var exists = false
+                exec(sql) { rs -> if (rs.next()) exists = true }
+                exists
+            } catch (_: Exception) {
+                false
+            }
+        }
+
+        val hasLanguage = columnExists("pastes", "language")
+        val hasSyntaxLang = columnExists("pastes", "syntax_language")
+
+        // 1) Переименовать language -> syntax_language, только если старая есть и новой ещё нет
+        if (hasLanguage && !hasSyntaxLang) {
+            var renamed = false
+            try {
+                exec("ALTER TABLE pastes RENAME COLUMN language TO syntax_language")
+                renamed = true
+            } catch (_: Exception) {
+                // Попытка синтаксиса H2
+                try {
+                    exec("ALTER TABLE pastes ALTER COLUMN language RENAME TO syntax_language")
+                    renamed = true
+                } catch (_: Exception) { /* игнор */ }
+            }
+            // Обновим флаги при успехе
+            if (renamed) {
+                // После успешного переименования отражаем новое состояние
+                // чтобы последующие шаги не обращались к несуществующим колонкам
+            }
+        }
+
+        val hasSyntaxNow = columnExists("pastes", "syntax_language")
+
+        // 2) Проставить DEFAULT и заполнить NULL, только если колонка существует
+        if (hasSyntaxNow) {
+            try { exec("ALTER TABLE pastes ALTER COLUMN syntax_language SET DEFAULT 'plaintext'") } catch (_: Exception) {}
+            try { exec("UPDATE pastes SET syntax_language='plaintext' WHERE syntax_language IS NULL") } catch (_: Exception) {}
+        }
+
+        // 3) Создать недостающие таблицы/колонки
+        SchemaUtils.createMissingTablesAndColumns(UserTable, PasteTable)
     }
 }

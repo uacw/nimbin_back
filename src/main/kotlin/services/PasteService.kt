@@ -89,7 +89,7 @@ class PasteService(
             visibility = request.visibility.toInternalVisibility(),
             createdAt = LocalDateTime.now().toString(),
             expiresAt = request.expiresAt,
-            language = request.language.trim()
+            syntaxLanguage = request.syntaxLanguage.trim()
         )
 
         try {

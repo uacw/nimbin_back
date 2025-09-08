@@ -45,7 +45,7 @@ data class PasteDto(
     val visibility: PasteVisibility = PUBLIC,    // Видимость заметки
     val createdAt: String,                       // ISO timestamp
     val expiresAt: String? = null,               // Время удаления (ISO timestamp)
-    val language: String = "text",               // Язык для подсветки
+    val syntaxLanguage: String = "plaintext",   // Язык для подсветки
     val viewCount: Int = 0                       // Счетчик просмотров
 )
 ```
@@ -72,7 +72,7 @@ data class CreatePasteRequestDto(
     val content: String,
     val visibility: PasteVisibility = PUBLIC,
     val expiresAt: String? = null,               // ✅ ИСПРАВЛЕНО: String вместо expiresInHours
-    val language: String = "text"
+    val syntaxLanguage: String = "plaintext"
 )
 ```
 
@@ -95,33 +95,12 @@ data class RegisterRequestDto(
 )
 ```
 
-#### UpdateProfileRequestDto (✅ НОВОЕ)
+#### UpdateProfileRequestDto
 ```kotlin
 @Serializable
 data class UpdateProfileRequestDto(
     val username: String? = null,
     val displayName: String? = null
-)
-```
-
-### Response DTO
-
-#### UserProfileDto (✅ НОВОЕ)
-```kotlin
-@Serializable
-data class UserProfileDto(
-    val user: UserDto,
-    val publicPastesCount: Int,
-    val totalPastesCount: Int? = null    // null для чужих профилей
-)
-```
-
-#### AuthResponseDto
-```kotlin
-@Serializable
-data class AuthResponseDto(
-    val token: String,
-    val user: UserDto
 )
 ```
 
@@ -204,7 +183,7 @@ class PastesViewModel(
                 title = title,
                 content = content,
                 visibility = visibility,
-                language = "kotlin"
+                syntaxLanguage = "kotlin"
             )
             
             val result = apiClient.createPaste(request, tokenManager.getToken())
