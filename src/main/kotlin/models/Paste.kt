@@ -16,6 +16,7 @@ import java.time.LocalDateTime
  * @property userId ID владельца заметки (null для анонимных заметок)
  * @property visibility Тип видимости заметки (PUBLIC, UNLISTED, PRIVATE)
  * @property createdAt Дата и время создания в формате ISO string
+ * @property updatedAt Дата и время последнего обновления в формате ISO string
  * @property expiresAt Дата и время автоудаления (null = не удалять)
  * @property language Язык программирования для подсветки синтаксиса
  * @property viewCount Счетчик просмотров заметки
@@ -28,6 +29,7 @@ data class Paste(
     val userId: String?,               // null — анонимная заметка
     val visibility: PasteVisibility = PasteVisibility.PUBLIC,
     val createdAt: String,             // ISO-строка
+    val updatedAt: String,             // ISO-строка
     val expiresAt: String? = null,
     val syntaxLanguage: String = "text",
     val viewCount: Int = 0

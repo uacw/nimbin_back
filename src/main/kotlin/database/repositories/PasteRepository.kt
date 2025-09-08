@@ -10,6 +10,7 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.LocalDateTime
+import tech.nimbus.utils.EtagUtil
 
 /**
  * Енум для типов сортировки заметок.
@@ -57,6 +58,7 @@ class PasteRepository : IPasteRepository {
             it[userId]     = paste.userId
             it[visibility] = paste.visibility
             it[createdAt]  = LocalDateTime.parse(paste.createdAt)
+            it[updatedAt]  = LocalDateTime.parse(paste.updatedAt)
             it[expiresAt]  = paste.expiresAt?.let(LocalDateTime::parse)
             it[syntaxLanguage]   = paste.syntaxLanguage
             it[viewCount]  = 0
@@ -316,6 +318,44 @@ class PasteRepository : IPasteRepository {
         } > 0
     }
 
+    /**
+     * Обновляет заметку с учетом ETag.
+     */
+    override suspend fun updatePaste(
+        pasteId: String,
+        title: String?,
+        content: String?,
+        syntaxLanguage: String?,
+        visibility: PasteVisibility?,
+        expiresAt: String?,
+        expectedEtag: String?
+    ): Paste? = transaction {
+        val existing = PasteTable.selectAll().where { PasteTable.id eq pasteId }.singleOrNull()
+            ?: return@transaction null
+
+        val current = mapRowToPaste(existing)
+        if (expectedEtag != null) {
+            val currentEtag = EtagUtil.compute(current.content, current.updatedAt)
+            if (!currentEtag.equals(expectedEtag, ignoreCase = true)) {
+                return@transaction null
+            }
+        }
+
+        val now = LocalDateTime.now()
+        PasteTable.update({ PasteTable.id eq pasteId }) {
+            title?.let { t -> it[PasteTable.title] = t }
+            content?.let { c -> it[PasteTable.content] = c }
+            syntaxLanguage?.let { sl -> it[PasteTable.syntaxLanguage] = sl }
+            visibility?.let { v -> it[PasteTable.visibility] = v }
+            if (expiresAt != null) {
+                it[PasteTable.expiresAt] = expiresAt.let(LocalDateTime::parse)
+            }
+            it[PasteTable.updatedAt] = now
+        }
+
+        PasteTable.selectAll().where { PasteTable.id eq pasteId }.singleOrNull()
+            ?.let { row -> mapRowToPaste(row) }
+    }
 
     /**
      * Вспомогательный метод для маппинга ResultRow в объект Paste.
@@ -328,6 +368,7 @@ class PasteRepository : IPasteRepository {
             userId = row[PasteTable.userId],
             visibility = row[PasteTable.visibility],
             createdAt = row[PasteTable.createdAt].toString(),
+            updatedAt = row[PasteTable.updatedAt].toString(),
             expiresAt = row[PasteTable.expiresAt]?.toString(),
             syntaxLanguage = row[PasteTable.syntaxLanguage],
             viewCount = row[PasteTable.viewCount]

@@ -49,7 +49,6 @@ fun Application.configureDatabases() {
     val dataSource = HikariDataSource(hikariConfig)
     Database.connect(dataSource)
 
-    // Авто-миграции и создание недостающих таблиц/колонок
     transaction {
         // Хелпер: проверка наличия колонки в таблице через INFORMATION_SCHEMA (кросс-СУБД)
         fun columnExists(table: String, column: String): Boolean {
@@ -101,6 +100,15 @@ fun Application.configureDatabases() {
         }
 
         // 3) Создать недостающие таблицы/колонки
+        // NEW: ensure updated_at exists and is populated
+        val hasUpdatedAt = columnExists("pastes", "updated_at")
+        if (!hasUpdatedAt) {
+            try { exec("ALTER TABLE pastes ADD COLUMN updated_at TIMESTAMP NULL") } catch (_: Exception) {}
+            // backfill from created_at if possible, otherwise current timestamp
+            try { exec("UPDATE pastes SET updated_at = COALESCE(created_at, CURRENT_TIMESTAMP) WHERE updated_at IS NULL") } catch (_: Exception) {}
+            try { exec("ALTER TABLE pastes ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP") } catch (_: Exception) {}
+        }
+
         SchemaUtils.createMissingTablesAndColumns(UserTable, PasteTable)
     }
 }

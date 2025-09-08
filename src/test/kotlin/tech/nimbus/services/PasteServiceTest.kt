@@ -54,13 +54,15 @@ class PasteServiceTest {
                 createdAt = LocalDateTime.now().toString()
             )
 
+            val now = LocalDateTime.now().toString()
             val testPaste = Paste(
                 id = "testPaste123", // 12 символов
                 title = "Test Paste",
                 content = "Test content",
                 userId = "user1",
                 visibility = PasteVisibility.PUBLIC,
-                createdAt = LocalDateTime.now().toString(),
+                createdAt = now,
+                updatedAt = now,
                 syntaxLanguage = "kotlin"
             )
 
@@ -122,13 +124,15 @@ class PasteServiceTest {
         @DisplayName("Should return paste when access is allowed")
         fun shouldReturnPasteWhenAccessIsAllowed() = runTest {
             // Arrange
+            val now = LocalDateTime.now().toString()
             val testPaste = Paste(
                 id = "validPaste12", // 12 символов
                 title = "Test Paste",
                 content = "Content",
                 userId = "user1",
                 visibility = PasteVisibility.PUBLIC,
-                createdAt = LocalDateTime.now().toString(),
+                createdAt = now,
+                updatedAt = now,
                 syntaxLanguage = "plaintext"
             )
 
@@ -209,13 +213,15 @@ class PasteServiceTest {
                 syntaxLanguage = "kotlin"
             )
 
+            val now = LocalDateTime.now().toString()
             val createdPaste = Paste(
                 id = "newPaste123",
                 title = "Valid Title",
                 content = "Valid content here",
                 userId = "user1",
                 visibility = PasteVisibility.PUBLIC,
-                createdAt = LocalDateTime.now().toString(),
+                createdAt = now,
+                updatedAt = now,
                 syntaxLanguage = "kotlin"
             )
 

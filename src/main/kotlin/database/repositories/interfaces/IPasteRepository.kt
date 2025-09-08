@@ -94,4 +94,17 @@ interface IPasteRepository {
      * Удаляет заметку пользователя.
      */
     suspend fun deletePaste(pasteId: String, userId: String): Boolean
+
+    /**
+     * Обновляет заметку с проверкой ETag.
+     */
+    suspend fun updatePaste(
+        pasteId: String,
+        title: String? = null,
+        content: String? = null,
+        syntaxLanguage: String? = null,
+        visibility: PasteVisibility? = null,
+        expiresAt: String? = null,
+        expectedEtag: String? = null
+    ): Paste?
 }

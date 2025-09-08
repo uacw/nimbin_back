@@ -15,6 +15,7 @@ import java.time.LocalDateTime
  * - user_id: VARCHAR(36) NULL
  * - visibility: VARCHAR(20) DEFAULT 'PUBLIC'
  * - created_at: TIMESTAMP DEFAULT NOW()
+ * - updated_at: TIMESTAMP DEFAULT NOW()
  * - expires_at: TIMESTAMP NULL
  * - syntax_language: VARCHAR(50) DEFAULT 'plaintext'
  * - view_count: INTEGER DEFAULT 0
@@ -26,6 +27,7 @@ object PasteTable : Table("pastes") {
     val userId    = varchar("user_id", 36).nullable()
     val visibility = enumerationByName<PasteVisibility>("visibility", 20).default(PasteVisibility.PUBLIC)
     val createdAt = datetime("created_at").default(LocalDateTime.now())
+    val updatedAt = datetime("updated_at").default(LocalDateTime.now())
     val expiresAt = datetime("expires_at").nullable()
 
     /** Язык подсветки синтаксиса */

@@ -47,13 +47,15 @@ class PasteVisibilityRepositoryTest {
         visibility: PasteVisibility,
         userId: String? = "user123"
     ): Paste {
+        val now = LocalDateTime.now().toString()
         return Paste(
             id = id,
             title = "Test Paste $id",
             content = "Content for $id",
             userId = userId,
             visibility = visibility,
-            createdAt = LocalDateTime.now().toString(),
+            createdAt = now,
+            updatedAt = now,
             expiresAt = null,
             syntaxLanguage = "plaintext",
             viewCount = 0

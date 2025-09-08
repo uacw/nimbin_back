@@ -81,13 +81,15 @@ class PasteService(
             throw PasteException.PrivatePasteRequiresAuth()
         }
 
+        val nowIso = LocalDateTime.now().toString()
         val paste = Paste(
             id = generatePasteId(),
             title = request.title.trim(),
             content = request.content,
             userId = userId,
             visibility = request.visibility.toInternalVisibility(),
-            createdAt = LocalDateTime.now().toString(),
+            createdAt = nowIso,
+            updatedAt = nowIso,
             expiresAt = request.expiresAt,
             syntaxLanguage = request.syntaxLanguage.trim()
         )

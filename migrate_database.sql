@@ -10,12 +10,65 @@ SET visibility = CASE
     WHEN is_public = false THEN 'PRIVATE'
     ELSE 'PUBLIC'
 END
-WHERE visibility = 'PUBLIC'; -- только для записей, которые еще не были мигрированы
+WHERE EXISTS (
+    SELECT 1 FROM information_schema.columns c
+    WHERE c.table_name = 'pastes' AND c.column_name = 'is_public'
+)
+AND visibility = 'PUBLIC';
 
 -- Удаляем старый столбец is_public (если существует)
 ALTER TABLE pastes DROP COLUMN IF EXISTS is_public;
 
--- Проверяем результат
-SELECT COUNT(*) as total_pastes, visibility, COUNT(*) as count_by_visibility
-FROM pastes
-GROUP BY visibility;
+-- === Новые изменения для ETag и синтаксиса ===
+
+-- 1) Добавить updated_at, заполнить для существующих строк и выставить DEFAULT/NOT NULL
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'pastes' AND column_name = 'updated_at'
+    ) THEN
+        ALTER TABLE pastes ADD COLUMN updated_at TIMESTAMP WITHOUT TIME ZONE;
+    END IF;
+END$$;
+
+-- Заполняем updated_at для всех строк, где он NULL (используем created_at или NOW())
+UPDATE pastes SET updated_at = COALESCE(updated_at, created_at, NOW()) WHERE updated_at IS NULL;
+
+-- Выставляем DEFAULT и NOT NULL
+ALTER TABLE pastes ALTER COLUMN updated_at SET DEFAULT NOW();
+ALTER TABLE pastes ALTER COLUMN updated_at SET NOT NULL;
+
+-- 2) Переименование language -> syntax_language (с сохранением данных)
+-- Добавляем целевой столбец, если его нет
+ALTER TABLE pastes ADD COLUMN IF NOT EXISTS syntax_language VARCHAR(50) DEFAULT 'plaintext' NOT NULL;
+
+-- Если существует старый столбец language, переносим значения
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'pastes' AND column_name = 'language'
+    ) THEN
+        EXECUTE 'UPDATE pastes SET syntax_language = language WHERE language IS NOT NULL AND language <> '''''' ';
+        -- Удаляем старый столбец
+        ALTER TABLE pastes DROP COLUMN language;
+    END IF;
+END$$;
+
+-- 3) Гарантируем наличие view_count с дефолтом 0
+ALTER TABLE pastes ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0 NOT NULL;
+
+-- 4) Гарантируем корректный DEFAULT для created_at (на всякий случай)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'pastes' AND column_name = 'created_at'
+    ) THEN
+        EXECUTE 'ALTER TABLE pastes ALTER COLUMN created_at SET DEFAULT NOW()';
+    END IF;
+END$$;
+
+-- Проверка (необязательная): подсчёт по visibility
+-- SELECT visibility, COUNT(*) FROM pastes GROUP BY visibility;

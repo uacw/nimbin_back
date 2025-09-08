@@ -7,7 +7,6 @@ import tech.nimbus.shared.dto.UserDto
 import tech.nimbus.shared.dto.PasteVisibility as SharedPasteVisibility
 import tech.nimbus.shared.dto.request.CreatePasteRequestDto
 import tech.nimbus.models.PasteVisibility as InternalPasteVisibility
-import tech.nimbus.models.request.CreatePasteRequest
 
 /**
  * Утилиты для конвертации между внутренними моделями и shared DTO.
@@ -21,6 +20,7 @@ object DtoConverters {
      * Конвертирует внутреннюю модель Paste в PasteDto для shared модуля.
      */
     fun Paste.toPasteDto(): PasteDto {
+        val etag = EtagUtil.compute(this.content, this.updatedAt)
         return PasteDto(
             id = this.id,
             title = this.title,
@@ -30,9 +30,11 @@ object DtoConverters {
             authorDisplayName = null,  // Будет заполнено в репозитории при JOIN
             visibility = this.visibility.toSharedVisibility(),
             createdAt = this.createdAt,
+            updatedAt = this.updatedAt,
             expiresAt = this.expiresAt,
             syntaxLanguage = this.syntaxLanguage,
-            viewCount = this.viewCount
+            viewCount = this.viewCount,
+            etag = etag
         )
     }
 
@@ -40,6 +42,7 @@ object DtoConverters {
      * Конвертирует внутреннюю модель Paste с автором в PasteDto.
      */
     fun Paste.toPasteDtoWithAuthor(author: User?): PasteDto {
+        val etag = EtagUtil.compute(this.content, this.updatedAt)
         return PasteDto(
             id = this.id,
             title = this.title,
@@ -49,9 +52,11 @@ object DtoConverters {
             authorDisplayName = author?.displayName,
             visibility = this.visibility.toSharedVisibility(),
             createdAt = this.createdAt,
+            updatedAt = this.updatedAt,
             expiresAt = this.expiresAt,
             syntaxLanguage = this.syntaxLanguage,
-            viewCount = this.viewCount
+            viewCount = this.viewCount,
+            etag = etag
         )
     }
 
@@ -67,19 +72,6 @@ object DtoConverters {
             createdAt = this.createdAt
         )
     }
-
-    /**
-     * Конвертирует CreatePasteRequestDto из shared модуля во внутреннюю модель.
-     */
-//    fun CreatePasteRequestDto.toCreatePasteRequest(): CreatePasteRequest {
-//        return CreatePasteRequest(
-//            title = this.title,
-//            content = this.content,
-//            visibility = this.visibility.toInternalVisibility(),
-//            expiresAt = this.expiresAt,
-//            language = this.language
-//        )
-//    }
 
     /**
      * Конвертирует внутренний enum PasteVisibility в shared enum.

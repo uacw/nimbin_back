@@ -14,6 +14,10 @@ import tech.nimbus.routes.utils.safeExecute
 import tech.nimbus.services.PasteService
 import tech.nimbus.shared.dto.request.CreatePasteRequestDto
 import tech.nimbus.shared.dto.DeleteResponseDto
+import tech.nimbus.database.repositories.PasteRepository
+import tech.nimbus.models.PasteVisibility
+import tech.nimbus.models.request.UpdatePasteRequest
+import tech.nimbus.utils.EtagUtil
 
 /**
  * Роуты для работы с заметками.
@@ -22,6 +26,7 @@ import tech.nimbus.shared.dto.DeleteResponseDto
  */
 fun Route.pasteRoutes() {
     val pasteService = PasteService()
+    val pasteRepository = PasteRepository()
 
     route("/api/pastes") {
 
@@ -55,6 +60,9 @@ fun Route.pasteRoutes() {
                     val pasteDto = pasteService.getPasteById(id, userId)
 
                     if (pasteDto != null) {
+                        pasteDto.etag?.let { etag ->
+                            call.response.headers.append(HttpHeaders.ETag, "\"$etag\"")
+                        }
                         call.respond(HttpStatusCode.OK, pasteDto)
                     } else {
                         call.respondError(
@@ -131,6 +139,49 @@ fun Route.pasteRoutes() {
                             "Paste not found or not owned"
                         )
                     }
+                }
+            }
+
+            // PUT /api/pastes/{id} - обновить заметку с поддержкой ETag (If-Match)
+            put("/{id}") {
+                call.safeExecute {
+                    val id = call.parameters["id"]
+                        ?: return@safeExecute call.respondError(HttpStatusCode.BadRequest, "Missing paste ID")
+
+                    val userId = call.getCurrentUserId()
+                        ?: return@safeExecute call.respondError(HttpStatusCode.Unauthorized, "Authentication required")
+
+                    // Проверяем, что заметка существует и принадлежит пользователю
+                    val existing = pasteRepository.getPasteById(id)
+                        ?: return@safeExecute call.respondError(HttpStatusCode.NotFound, "Paste not found")
+
+                    if (existing.userId == null || existing.userId != userId) {
+                        return@safeExecute call.respondError(HttpStatusCode.Forbidden, "Only the owner can update the paste")
+                    }
+
+                    val ifMatch = call.request.headers[HttpHeaders.IfMatch]
+                        ?.trim()?.removePrefix("\"")?.removeSuffix("\"")
+                        ?: return@safeExecute call.respondError(HttpStatusCode(428, "Precondition Required"), "If-Match header required")
+
+                    val req = call.receive<UpdatePasteRequest>()
+
+                    val newVisibility = req.visibility?.let { vis ->
+                        try { PasteVisibility.valueOf(vis.uppercase()) } catch (_: Exception) { null }
+                    }
+
+                    val updated = pasteRepository.updatePaste(
+                        pasteId = id,
+                        title = req.title,
+                        content = req.content,
+                        syntaxLanguage = req.syntaxLanguage,
+                        visibility = newVisibility,
+                        expiresAt = req.expiresAt,
+                        expectedEtag = ifMatch
+                    ) ?: return@safeExecute call.respondError(HttpStatusCode.PreconditionFailed, "ETag mismatch or update rejected")
+
+                    val etag = EtagUtil.compute(updated.content, updated.updatedAt)
+                    call.response.headers.append(HttpHeaders.ETag, "\"$etag\"")
+                    call.respond(HttpStatusCode.OK, updated)
                 }
             }
         }
