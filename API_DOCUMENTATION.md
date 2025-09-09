@@ -25,18 +25,29 @@ Authorization: Bearer <jwt_token>
 
 ---
 
+## Контроль версий через ETag
+
+- Для одиночного получения заметки сервер возвращает заголовок ответа `ETag: "<hash>"`.
+- Значение ETag формируется из содержимого заметки и времени её обновления.
+- Для обновления заметки необходимо передать заголовок запроса `If-Match: "<текущий-etag>"`.
+- Если заголовок отсутствует — `428 Precondition Required`.
+- Если ETag не совпадает (заметка была изменена) — `412 Precondition Failed`.
+- В успешных ответах на создание/обновление сервер возвращает новый ETag в заголовке и (если доступно) в поле `etag` тела ответа.
+
+---
+
 ## 🔐 Аутентификация и авторизация
 
 ### Поток аутентификации для Android приложения:
 
-1. **Регистрация нового пользователя**: `POST /api/auth/register`
-2. **Логин существующего пользователя**: `POST /api/auth/login` 
-3. **Сохранение JWT токена** в SharedPreferences или защищенном хранилище
-4. **Передача токена** во всех защищенных запросах через заголовок `Authorization: Bearer <token>`
-5. **Обновление токена** при истечении (через повторный логин)
+1. Регистрация нового пользователя: `POST /api/auth/register`
+2. Логин существующего пользователя: `POST /api/auth/login` 
+3. Сохранение JWT токена в SharedPreferences или защищенном хранилище
+4. Передача токена во всех защищенных запросах через заголовок `Authorization: Bearer <token>`
+5. Обновление токена при истечении (через повторный логин)
 
 ### Время жизни токена:
-- **24 часа** с момента выпуска
+- 24 часа с момента выпуска
 - После истечения требуется повторный логин
 
 ---
@@ -72,8 +83,8 @@ Content-Type: application/json
 ```
 
 **Возможные ошибки:**
-- `400 Bad Request` - некорректные данные валидации
-- `409 Conflict` - пользователь с таким username или email уже существует
+- 400 Bad Request — некорректные данные валидации
+- 409 Conflict — пользователь с таким username или email уже существует
 
 #### Логин пользователя
 ```http
@@ -100,11 +111,11 @@ Content-Type: application/json
 }
 ```
 
-**⚠️ ВАЖНОЕ ИЗМЕНЕНИЕ:** Логин теперь происходит строго по **email адресу**, а не по username.
+Важное изменение: логин строго по email адресу (не по username).
 
 **Возможные ошибки:**
-- `400 Bad Request` - некорректные данные
-- `401 Unauthorized` - неверный email или пароль
+- 400 Bad Request — некорректные данные
+- 401 Unauthorized — неверный email или пароль
 
 ---
 
@@ -130,20 +141,20 @@ GET /api/users/{userId}
 }
 ```
 
-**Примечание:** `totalPastesCount` всегда `null` для чужих профилей по соображениям приватности.
+Примечание: `totalPastesCount` всегда `null` для чужих профилей по соображениям приватности.
 
 #### Получить публичные заметки пользователя
 ```http
 GET /api/users/{userId}/pastes?sort={createdAt|title|viewCount}&order={asc|desc}&limit=20&offset=0
 ```
 
-**Параметры:**
-- `sort`: `createdAt` (по умолчанию), `title`, `viewCount`
-- `order`: `desc` (по умолчанию), `asc`
+Параметры:
+- `sort`: createdAt (по умолчанию), title, viewCount
+- `order`: desc (по умолчанию), asc
 - `limit`: максимум заметок (по умолчанию 20, максимум 100)
 - `offset`: пропустить заметок (для пагинации)
 
-**Ответ (200 OK):** Массив объектов заметок с информацией об авторе.
+**Ответ (200 OK):** массив объектов заметок с информацией об авторе.
 
 #### Получить свой профиль (требует аутентификации)
 ```http
@@ -166,7 +177,7 @@ Authorization: Bearer <jwt_token>
 }
 ```
 
-**Примечание:** `totalPastesCount` включает все заметки (включая PRIVATE) только для владельца профиля.
+Примечание: `totalPastesCount` включает все заметки (включая PRIVATE) только для владельца профиля.
 
 #### Обновить профиль (требует аутентификации)
 ```http
@@ -191,14 +202,7 @@ Content-Type: application/json
 }
 ```
 
-**Валидация:**
-- `username`: 3-50 символов, только буквы, цифры и подчеркивания
-- `displayName`: до 100 символов, может быть null
-
-**Возможные ошибки:**
-- `400 Bad Request` - ошибки валидации
-- `401 Unauthorized` - отсутствует или неверный токен
-- `409 Conflict` - username уже занят
+Возможные ошибки: 400, 401, 409.
 
 ---
 
@@ -212,17 +216,17 @@ Authorization: Bearer <jwt_token>  # Опционально для PUBLIC/UNLIST
 
 {
     "title": "Название заметки",
-    "content": "Содержимое заметки с поддержкой кириллицы",
+    "content": "Содержимое заметки",
     "syntaxLanguage": "kotlin",
-    "visibility": "PUBLIC",  # PUBLIC, UNLISTED, PRIVATE
-    "expiresAt": "2025-12-31T23:59:59"  # Опционально
+    "visibility": "PUBLIC",
+    "expiresAt": "2025-12-31T23:59:59"
 }
 ```
 
-**Уровни видимости:**
-- `PUBLIC` - видна всем, появляется в публичных списках
-- `UNLISTED` - доступна по прямой ссылке, не появляется в публичных списках
-- `PRIVATE` - доступна только автору (требует аутентификации)
+Уровни видимости:
+- PUBLIC — видна всем, появляется в публичных списках
+- UNLISTED — доступна по прямой ссылке, не появляется в публичных списках
+- PRIVATE — доступна только автору (требует аутентификации)
 
 **Ответ (201 Created):**
 ```json
@@ -235,11 +239,15 @@ Authorization: Bearer <jwt_token>  # Опционально для PUBLIC/UNLIST
     "authorDisplayName": "John Doe",
     "visibility": "PUBLIC",
     "createdAt": "2025-08-25T10:30:00",
+    "updatedAt": "2025-08-25T10:30:00",
     "expiresAt": null,
     "syntaxLanguage": "kotlin",
-    "viewCount": 0
+    "viewCount": 0,
+    "etag": "b3d6c0..."
 }
 ```
+
+В заголовках ответа присутствует `ETag: "b3d6c0..."`.
 
 #### Получить заметку по ID
 ```http
@@ -258,29 +266,76 @@ Authorization: Bearer <jwt_token>  # Для приватных заметок
     "authorDisplayName": "John Doe",
     "visibility": "PUBLIC",
     "createdAt": "2025-08-25T10:30:00",
+    "updatedAt": "2025-08-25T10:40:00",
     "expiresAt": null,
     "syntaxLanguage": "kotlin",
-    "viewCount": 42
+    "viewCount": 42,
+    "etag": "b3d6c0..."
 }
 ```
 
-**Особенности:**
-- Для анонимных заметок `userId`, `authorUsername` и `authorDisplayName` будут `null`
-- Счетчик просмотров автоматически увеличивается на 1 при каждом обращении
-- Доступ к заметкам проверяется по правилам видимости
+Особенности:
+- В заголовке ответа присутствует `ETag`.
+- Для анонимных заметок `userId`, `authorUsername`, `authorDisplayName` — `null`.
+- Счетчик просмотров увеличивается на 1 при каждом обращении (для публичных/доступных заметок).
+- Доступ проверяется по правилам видимости.
+
+#### Обновить заметку (If-Match / ETag)
+```http
+PUT /api/pastes/{pasteId}
+Authorization: Bearer <jwt_token>
+If-Match: "<текущий-etag>"
+Content-Type: application/json
+
+{
+  "title": "Новое название",           // опционально
+  "content": "Новое содержимое",       // опционально
+  "syntaxLanguage": "kotlin",          // опционально
+  "visibility": "PUBLIC",              // опционально (PUBLIC|UNLISTED|PRIVATE)
+  "expiresAt": "2025-12-31T23:59:59"   // опционально
+}
+```
+
+**Ответ (200 OK):**
+```json
+{
+  "id": "abc123def456",
+  "title": "Новое название",
+  "content": "Новое содержимое",
+  "userId": "user-uuid-123",
+  "authorUsername": "john_doe",
+  "authorDisplayName": "John Doe",
+  "visibility": "PUBLIC",
+  "createdAt": "2025-08-25T10:30:00",
+  "updatedAt": "2025-08-25T11:00:00",
+  "expiresAt": null,
+  "syntaxLanguage": "kotlin",
+  "viewCount": 42,
+  "etag": "9f2a1b..."
+}
+```
+
+Заголовок ответа: `ETag: "9f2a1b..."` — новое значение после обновления.
+
+**Возможные ошибки:**
+- 401 Unauthorized — отсутствует/неверный токен
+- 403 Forbidden — обновлять может только владелец заметки
+- 404 Not Found — заметка не найдена
+- 428 Precondition Required — отсутствует заголовок `If-Match`
+- 412 Precondition Failed — ETag не совпал (заметка была изменена)
 
 #### Получить публичные заметки
 ```http
 GET /api/pastes/public?sort={createdAt|title|viewCount}&order={asc|desc}&limit=20&offset=0
 ```
 
-**Параметры:**
-- `sort`: `createdAt` (по умолчанию), `title`, `viewCount`
-- `order`: `desc` (по умолчанию), `asc`
+Параметры:
+- `sort`: createdAt (по умолчанию), title, viewCount
+- `order`: desc (по умолчанию), asc
 - `limit`: максимум заметок (по умолчанию 20, максимум 100)
 - `offset`: пропустить заметок (для пагинации)
 
-**Ответ (200 OK):** Массив объектов заметок, аналогичных ответу `GET /api/pastes/{pasteId}`.
+**Ответ (200 OK):** массив объектов заметок, аналогичных ответу `GET /api/pastes/{pasteId}`.
 
 #### Получить свои заметки (требует аутентификации)
 ```http
@@ -288,10 +343,10 @@ GET /api/pastes/my?visibility={ALL|PUBLIC|UNLISTED|PRIVATE}&sort={createdAt|titl
 Authorization: Bearer <jwt_token>
 ```
 
-**Параметры:**
-- `visibility`: `ALL` (по умолчанию), `PUBLIC`, `UNLISTED`, `PRIVATE`
-- `sort`: `createdAt` (по умолчанию), `title`, `viewCount`
-- `order`: `desc` (по умолчанию), `asc`
+Параметры:
+- `visibility`: ALL (по умолчанию), PUBLIC, UNLISTED, PRIVATE
+- `sort`: createdAt (по умолчанию), title, viewCount
+- `order`: desc (по умолчанию), asc
 - `limit`: максимум заметок (по умолчанию 20, максимум 100)
 - `offset`: пропустить заметок (для пагинации)
 
@@ -303,15 +358,10 @@ Authorization: Bearer <jwt_token>
 
 **Ответ (200 OK):**
 ```json
-{
-    "message": "Paste deleted successfully"
-}
+{ "message": "Paste deleted successfully" }
 ```
 
-**Возможные ошибки:**
-- `401 Unauthorized` - отсутствует токен
-- `403 Forbidden` - попытка удалить чужую заметку
-- `404 Not Found` - заметка не найдена
+Возможные ошибки: 401, 403, 404.
 
 ---
 
@@ -321,178 +371,43 @@ Authorization: Bearer <jwt_token>
 В ответах API заметки содержат информацию об авторе:
 ```json
 {
-    "userId": "uuid-string",
-    "authorUsername": "john_doe", 
-    "authorDisplayName": "John Doe"
+  "userId": "uuid-string",
+  "authorUsername": "john_doe",
+  "authorDisplayName": "John Doe",
+  "updatedAt": "ISO",
+  "etag": "строка"
 }
 ```
 
-**Для UI списков заметок:**
-- Отображайте `authorDisplayName` как основное имя. Если оно `null`, используйте `authorUsername`.
-- Показывайте `@authorUsername` как secondary text.
-- Используйте `userId` для навигации в профиль пользователя.
+Рекомендации:
+- Показывайте `authorDisplayName` как основное имя. Если `null`, используйте `authorUsername`.
+- Для оптимистичного обновления заметок сохраняйте полученный `etag` и передавайте его в `If-Match` при PUT.
 
 ### Обработка ошибок
 API возвращает ошибки в формате:
 ```json
-{
-    "error": "Описание ошибки"
-}
+{ "error": "Описание ошибки" }
 ```
 
-**Основные HTTP коды:**
-- `200` - Успешно
-- `201` - Создано (новая заметка/пользователь)
-- `400` - Неверный запрос (валидация)
-- `401` - Требуется аутентификация
-- `403` - Доступ запрещен
-- `404` - Не найдено
-- `409` - Конфликт (пользователь уже существует)
-- `500` - Внутренняя ошибка сервера
-
-### Управление JWT токенами
-**Рекомендации:**
-- Сохраняйте токен в `EncryptedSharedPreferences`
-- Проверяйте срок действия перед каждым запросом
-- Автоматически перенаправляйте на экран логина при получении 401
-- Реализуйте автоматический refresh через повторный логин
+Коды: 200, 201, 400, 401, 403, 404, 409, 412, 428, 500.
 
 ### Пагинация
-Все списочные endpoints поддерживают пагинацию:
-- Используйте `limit` и `offset` параметры
-- Рекомендуемый размер страницы: 20-50 элементов
-- Максимальный лимит: 100 элементов
-
-### Кэширование
-- Кэшируйте публичные заметки локально
-- Обновляйте кэш при создании новых заметок
-- Учитывайте `expiresAt` при кэшировании
-- Инвалидируйте кэш при изменении профиля
+Списочные endpoints поддерживают `limit` и `offset`.
 
 ---
 
 ## 🔧 Технические детали
 
-### База данных
-- **PostgreSQL 16** с UTF-8 кодировкой
-- **HikariCP** connection pool для оптимальной производительности
-- **Exposed ORM** для типобезопасных запросов
-
-### Безопасность
-- **JWT токены** с HMAC SHA-256 подписью
-- **Bcrypt** хэширование паролей (cost factor 12)
-- **CORS** настроен для разработки и production
-- **SQL injection** защита через Exposed ORM
-- **Валидация** входных данных на всех endpoints
-
-### Производительность
-- **Connection pooling** для оптимальной работы с БД
-- **Indexed queries** для быстрого поиска
-- **Пагинация** для больших списков
-- **Lazy loading** для связанных данных
+- PostgreSQL 16, HikariCP, Exposed ORM
+- JWT (HS256), Bcrypt, CORS
+- Индексация ключевых полей, пагинация, кэширование на клиенте с ETag
 
 ---
 
 ## 📋 Shared модуль для Android интеграции
 
-Для упрощения интеграции с Android приложением создан shared модуль с общими моделями данных.
-
-### Подключение в Android проекте
-```kotlin
-// settings.gradle.kts
-include(":shared")
-project(":shared").projectDir = file("../Nimbin_back/shared")
-
-// build.gradle.kts (app module)
-implementation(project(":shared"))
-```
-
-### Основные модели
-Все DTO модели готовы к использованию с Kotlinx Serialization:
-
-```kotlin
-@Serializable
-data class CreatePasteRequestDto(
-    val title: String,
-    val content: String,
-    val syntaxLanguage: String = "plaintext",
-    val visibility: PasteVisibility = PasteVisibility.PUBLIC,
-    val expiresAt: String? = null
-)
-
-@Serializable  
-data class LoginRequestDto(
-    val email: String,    // ⚠️ Логин по email!
-    val password: String
-)
-
-@Serializable
-data class RegisterRequestDto(
-    val username: String,
-    val email: String,
-    val password: String
-)
-
-@Serializable
-data class UpdateProfileRequestDto(
-    val username: String? = null,
-    val displayName: String? = null
-)
-
-@Serializable
-data class UserProfileDto(
-    val user: UserDto,
-    val publicPastesCount: Int,
-    val totalPastesCount: Int? = null
-)
-
-enum class PasteVisibility { PUBLIC, UNLISTED, PRIVATE }
-```
+Для упрощения интеграции создан shared модуль с общими моделями данных (Kotlinx Serialization). Актуальные поля `PasteDto`: `createdAt`, `updatedAt`, `etag`, `syntaxLanguage` и др.
 
 ---
 
-## ✅ Чек-лист для Android разработчика
-
-### Перед началом разработки:
-- [ ] Убедитесь, что backend доступен: `GET https://nimbin-back-1de949af6629.herokuapp.com/api/pastes/public`
-- [ ] Добавьте shared модуль в зависимости Android проекта
-- [ ] Настройте HTTP клиент (Retrofit/Ktor Client) с base URL
-- [ ] Реализуйте JWT токен менеджмент
-
-### Основные функции для реализации:
-- [ ] Экран регистрации/логина с сохранением JWT токена
-- [ ] Список публичных заметок с пагинацией и отображением автора
-- [ ] Создание новой заметки с выбором видимости
-- [ ] Просмотр заметки с инкрементом счетчика и отображением автора
-- [ ] Профиль пользователя с его публичными заметками
-- [ ] Список "Мои заметки" с фильтрацией по видимости
-- [ ] Редактирование профиля (displayName и username)
-
-### Рекомендуемые библиотеки:
-- **Networking**: Retrofit + OkHttp или Ktor Client
-- **JSON**: Kotlinx Serialization (готова в shared модуле)
-- **Навигация**: Navigation Component + Deep links для профилей
-- **UI**: Jetpack Compose с Material Design
-- **Хранение токена**: EncryptedSharedPreferences
-- **Архитектура**: MVVM + Repository pattern
-
----
-
-## 📞 Поддержка и развертывание
-
-### Production Environment
-- **URL**: `https://nimbin-back-1de949af6629.herokuapp.com`
-- **База данных**: PostgreSQL на Heroku
-- **Мониторинг**: Heroku metrics и логи
-
-### Статус системы
-Для проверки работоспособности API используйте health check:
-```http
-GET /api/pastes/public
-```
-
-Если возвращается список заметок - система работает корректно.
-
----
-
-*Документация актуализирована: 08 сентября 2025*
+*Документация актуализирована: 09 сентября 2025*
