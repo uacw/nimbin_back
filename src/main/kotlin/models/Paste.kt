@@ -31,6 +31,6 @@ data class Paste(
     val createdAt: String,             // ISO-строка
     val updatedAt: String,             // ISO-строка
     val expiresAt: String? = null,
-    val syntaxLanguage: String = "text",
+    val syntaxLanguage: String = "plaintext",
     val viewCount: Int = 0
 )

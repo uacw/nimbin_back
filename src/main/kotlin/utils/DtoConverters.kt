@@ -16,6 +16,16 @@ import tech.nimbus.models.PasteVisibility as InternalPasteVisibility
  */
 object DtoConverters {
 
+    /** Нормализация значения языка подсветки. */
+    fun normalizeSyntaxLanguage(value: String?): String? {
+        val v = value?.trim()?.lowercase() ?: return null
+        if (v.isBlank()) return "plaintext"
+        return when (v) {
+            "text" -> "plaintext"
+            else -> v
+        }
+    }
+
     /**
      * Конвертирует внутреннюю модель Paste в PasteDto для shared модуля.
      */

@@ -11,6 +11,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.LocalDateTime
 import tech.nimbus.utils.EtagUtil
+import tech.nimbus.utils.DtoConverters.normalizeSyntaxLanguage
 
 /**
  * Енум для типов сортировки заметок.
@@ -345,7 +346,7 @@ class PasteRepository : IPasteRepository {
         PasteTable.update({ PasteTable.id eq pasteId }) {
             title?.let { t -> it[PasteTable.title] = t }
             content?.let { c -> it[PasteTable.content] = c }
-            syntaxLanguage?.let { sl -> it[PasteTable.syntaxLanguage] = sl }
+            normalizeSyntaxLanguage(syntaxLanguage)?.let { sl -> it[PasteTable.syntaxLanguage] = sl }
             visibility?.let { v -> it[PasteTable.visibility] = v }
             if (expiresAt != null) {
                 it[PasteTable.expiresAt] = expiresAt.let(LocalDateTime::parse)

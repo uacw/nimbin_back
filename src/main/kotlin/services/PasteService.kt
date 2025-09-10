@@ -14,6 +14,7 @@ import tech.nimbus.validation.ValidationResult
 import tech.nimbus.exceptions.*
 import tech.nimbus.models.Paste
 import java.time.LocalDateTime
+import tech.nimbus.utils.DtoConverters.normalizeSyntaxLanguage
 
 /**
  * Сервис для работы с заметками.
@@ -91,7 +92,7 @@ class PasteService(
             createdAt = nowIso,
             updatedAt = nowIso,
             expiresAt = request.expiresAt,
-            syntaxLanguage = request.syntaxLanguage.trim()
+            syntaxLanguage = normalizeSyntaxLanguage(request.syntaxLanguage) ?: "plaintext"
         )
 
         try {
