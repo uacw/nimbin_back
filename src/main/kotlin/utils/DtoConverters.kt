@@ -29,7 +29,7 @@ object DtoConverters {
     /**
      * Конвертирует внутреннюю модель Paste в PasteDto для shared модуля.
      */
-    fun Paste.toPasteDto(): PasteDto {
+    fun Paste.toPasteDto(isFavorite: Boolean? = null): PasteDto {
         val etag = EtagUtil.compute(this.content, this.updatedAt)
         return PasteDto(
             id = this.id,
@@ -44,14 +44,15 @@ object DtoConverters {
             expiresAt = this.expiresAt,
             syntaxLanguage = this.syntaxLanguage,
             viewCount = this.viewCount,
-            etag = etag
+            etag = etag,
+            isFavorite = isFavorite
         )
     }
 
     /**
      * Конвертирует внутреннюю модель Paste с автором в PasteDto.
      */
-    fun Paste.toPasteDtoWithAuthor(author: User?): PasteDto {
+    fun Paste.toPasteDtoWithAuthor(author: User?, isFavorite: Boolean? = null): PasteDto {
         val etag = EtagUtil.compute(this.content, this.updatedAt)
         return PasteDto(
             id = this.id,
@@ -66,7 +67,8 @@ object DtoConverters {
             expiresAt = this.expiresAt,
             syntaxLanguage = this.syntaxLanguage,
             viewCount = this.viewCount,
-            etag = etag
+            etag = etag,
+            isFavorite = isFavorite
         )
     }
 

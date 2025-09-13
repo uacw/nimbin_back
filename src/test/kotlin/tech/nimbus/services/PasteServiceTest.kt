@@ -13,6 +13,7 @@ import org.mockito.kotlin.whenever
 import tech.nimbus.database.repositories.PasteWithAuthor
 import tech.nimbus.database.repositories.PasteSortOrder
 import tech.nimbus.database.repositories.interfaces.IPasteRepository
+import tech.nimbus.database.repositories.interfaces.IFavoritesRepository
 import tech.nimbus.exceptions.*
 import tech.nimbus.models.Paste
 import tech.nimbus.models.PasteVisibility
@@ -29,12 +30,14 @@ import java.time.LocalDateTime
 class PasteServiceTest {
 
     private lateinit var mockRepository: IPasteRepository
+    private lateinit var mockFavorites: IFavoritesRepository
     private lateinit var pasteService: PasteService
 
     @BeforeEach
     fun setUp() {
         mockRepository = mock(IPasteRepository::class.java)
-        pasteService = PasteService(mockRepository)
+        mockFavorites = mock(IFavoritesRepository::class.java)
+        pasteService = PasteService(mockRepository, mockFavorites)
     }
 
     @Nested

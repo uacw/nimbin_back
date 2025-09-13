@@ -15,9 +15,11 @@ import tech.nimbus.services.PasteService
 import tech.nimbus.shared.dto.request.CreatePasteRequestDto
 import tech.nimbus.shared.dto.DeleteResponseDto
 import tech.nimbus.database.repositories.PasteRepository
-import tech.nimbus.models.PasteVisibility
-import tech.nimbus.models.request.UpdatePasteRequest
+import tech.nimbus.shared.dto.request.UpdatePasteRequestDto
+import tech.nimbus.utils.DtoConverters.toPasteDtoWithAuthor
+import tech.nimbus.utils.DtoConverters.toInternalVisibility
 import tech.nimbus.utils.EtagUtil
+import tech.nimbus.database.repositories.FavoritesRepository
 
 /**
  * Роуты для работы с заметками.
@@ -27,22 +29,27 @@ import tech.nimbus.utils.EtagUtil
 fun Route.pasteRoutes() {
     val pasteService = PasteService()
     val pasteRepository = PasteRepository()
+    val favoritesRepository = FavoritesRepository()
 
     route("/api/pastes") {
 
-        // GET /api/pastes/public - получить публичные заметки
-        get("/public") {
-            call.safeExecute {
-                val pagination = call.getPaginationParams()
-                val sortOrder = call.getSortOrder()
+        // GET /api/pastes/public - получить публичные заметки (optional auth для флага избранного)
+        authenticate("auth-jwt", optional = true) {
+            get("/public") {
+                call.safeExecute {
+                    val pagination = call.getPaginationParams()
+                    val sortOrder = call.getSortOrder()
+                    val currentUserId = call.getCurrentUserId()
 
-                val pasteResponses = pasteService.getPublicPastes(
-                    limit = pagination.limit,
-                    offset = pagination.offset,
-                    sortOrder = sortOrder
-                )
+                    val pasteResponses = pasteService.getPublicPastes(
+                        limit = pagination.limit,
+                        offset = pagination.offset,
+                        sortOrder = sortOrder,
+                        currentUserId = currentUserId
+                    )
 
-                call.respond(HttpStatusCode.OK, pasteResponses)
+                    call.respond(HttpStatusCode.OK, pasteResponses)
+                }
             }
         }
 
@@ -99,15 +106,50 @@ fun Route.pasteRoutes() {
 
                     val pagination = call.getPaginationParams()
                     val sortOrder = call.getSortOrder()
+                    val favoriteOnly = call.request.queryParameters["favorite"]?.let { it.equals("true", true) } ?: false
 
                     val userPastes = pasteService.getUserPastes(
                         userId = userId,
                         limit = pagination.limit,
                         offset = pagination.offset,
-                        sortOrder = sortOrder
+                        sortOrder = sortOrder,
+                        favoriteOnly = favoriteOnly
                     )
 
                     call.respond(HttpStatusCode.OK, userPastes)
+                }
+            }
+
+            // POST /api/pastes/{id}/favorite - добавить в избранное
+            post("/{id}/favorite") {
+                call.safeExecute {
+                    val id = call.parameters["id"]
+                        ?: return@safeExecute call.respondError(HttpStatusCode.BadRequest, "Missing paste ID")
+
+                    val userId = call.getCurrentUserId()
+                        ?: return@safeExecute call.respondError(HttpStatusCode.Unauthorized, "Authentication required")
+
+                    // Проверяем доступность заметки для пользователя
+                    if (!pasteRepository.canAccessPaste(id, userId)) {
+                        return@safeExecute call.respondError(HttpStatusCode.NotFound, "Paste not found")
+                    }
+
+                    favoritesRepository.addFavorite(userId, id)
+                    call.respond(HttpStatusCode.OK, DeleteResponseDto("Added to favorites"))
+                }
+            }
+
+            // DELETE /api/pastes/{id}/favorite - удалить из избранного
+            delete("/{id}/favorite") {
+                call.safeExecute {
+                    val id = call.parameters["id"]
+                        ?: return@safeExecute call.respondError(HttpStatusCode.BadRequest, "Missing paste ID")
+
+                    val userId = call.getCurrentUserId()
+                        ?: return@safeExecute call.respondError(HttpStatusCode.Unauthorized, "Authentication required")
+
+                    favoritesRepository.removeFavorite(userId, id)
+                    call.respond(HttpStatusCode.OK, DeleteResponseDto("Removed from favorites"))
                 }
             }
 
@@ -163,25 +205,25 @@ fun Route.pasteRoutes() {
                         ?.trim()?.removePrefix("\"")?.removeSuffix("\"")
                         ?: return@safeExecute call.respondError(HttpStatusCode(428, "Precondition Required"), "If-Match header required")
 
-                    val req = call.receive<UpdatePasteRequest>()
-
-                    val newVisibility = req.visibility?.let { vis ->
-                        try { PasteVisibility.valueOf(vis.uppercase()) } catch (_: Exception) { null }
-                    }
+                    val req = call.receive<UpdatePasteRequestDto>()
 
                     val updated = pasteRepository.updatePaste(
                         pasteId = id,
                         title = req.title,
                         content = req.content,
                         syntaxLanguage = req.syntaxLanguage,
-                        visibility = newVisibility,
+                        visibility = req.visibility?.toInternalVisibility(),
                         expiresAt = req.expiresAt,
                         expectedEtag = ifMatch
                     ) ?: return@safeExecute call.respondError(HttpStatusCode.PreconditionFailed, "ETag mismatch or update rejected")
 
-                    val etag = EtagUtil.compute(updated.content, updated.updatedAt)
-                    call.response.headers.append(HttpHeaders.ETag, "\"$etag\"")
-                    call.respond(HttpStatusCode.OK, updated)
+                    // Перечитываем с автором и возвращаем согласованный DTO
+                    val withAuthor = pasteRepository.getPasteWithAuthor(id)
+                    val dto = withAuthor?.paste?.toPasteDtoWithAuthor(withAuthor.author)
+                        ?: updated.let { it.toPasteDtoWithAuthor(null) }
+
+                    dto.etag?.let { etag -> call.response.headers.append(HttpHeaders.ETag, "\"$etag\"") }
+                    call.respond(HttpStatusCode.OK, dto)
                 }
             }
         }

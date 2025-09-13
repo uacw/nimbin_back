@@ -208,6 +208,13 @@ Content-Type: application/json
 
 ### 📄 Управление заметками
 
+#### Модель ответа заметки (PasteDto)
+Полезные поля:
+- `updatedAt` — время последнего обновления
+- `etag` — текущая версия для If-Match
+- `syntaxLanguage` — язык подсветки
+- `isFavorite` — признак, что заметка в избранном у текущего пользователя (присутствует при запросах с токеном)
+
 #### Создать заметку
 ```http
 POST /api/pastes
@@ -222,11 +229,6 @@ Authorization: Bearer <jwt_token>  # Опционально для PUBLIC/UNLIST
     "expiresAt": "2025-12-31T23:59:59"
 }
 ```
-
-Уровни видимости:
-- PUBLIC — видна всем, появляется в публичных списках
-- UNLISTED — доступна по прямой ссылке, не появляется в публичных списках
-- PRIVATE — доступна только автору (требует аутентификации)
 
 **Ответ (201 Created):**
 ```json
@@ -243,7 +245,8 @@ Authorization: Bearer <jwt_token>  # Опционально для PUBLIC/UNLIST
     "expiresAt": null,
     "syntaxLanguage": "kotlin",
     "viewCount": 0,
-    "etag": "b3d6c0..."
+    "etag": "b3d6c0...",
+    "isFavorite": false
 }
 ```
 
@@ -252,7 +255,7 @@ Authorization: Bearer <jwt_token>  # Опционально для PUBLIC/UNLIST
 #### Получить заметку по ID
 ```http
 GET /api/pastes/{pasteId}
-Authorization: Bearer <jwt_token>  # Для приватных заметок
+Authorization: Bearer <jwt_token>  # Для приватных заметок; при наличии вернётся `isFavorite`
 ```
 
 **Ответ (200 OK):**
@@ -270,15 +273,14 @@ Authorization: Bearer <jwt_token>  # Для приватных заметок
     "expiresAt": null,
     "syntaxLanguage": "kotlin",
     "viewCount": 42,
-    "etag": "b3d6c0..."
+    "etag": "b3d6c0...",
+    "isFavorite": true
 }
 ```
 
 Особенности:
 - В заголовке ответа присутствует `ETag`.
-- Для анонимных заметок `userId`, `authorUsername`, `authorDisplayName` — `null`.
-- Счетчик просмотров увеличивается на 1 при каждом обращении (для публичных/доступных заметок).
-- Доступ проверяется по правилам видимости.
+- При наличии токена поле `isFavorite` отражает статус в избранном для текущего пользователя.
 
 #### Обновить заметку (If-Match / ETag)
 ```http
@@ -296,46 +298,17 @@ Content-Type: application/json
 }
 ```
 
-**Ответ (200 OK):**
-```json
-{
-  "id": "abc123def456",
-  "title": "Новое название",
-  "content": "Новое содержимое",
-  "userId": "user-uuid-123",
-  "authorUsername": "john_doe",
-  "authorDisplayName": "John Doe",
-  "visibility": "PUBLIC",
-  "createdAt": "2025-08-25T10:30:00",
-  "updatedAt": "2025-08-25T11:00:00",
-  "expiresAt": null,
-  "syntaxLanguage": "kotlin",
-  "viewCount": 42,
-  "etag": "9f2a1b..."
-}
-```
+**Ответ (200 OK):** — аналогично `GET /api/pastes/{pasteId}` с новым `etag`.
 
-Заголовок ответа: `ETag: "9f2a1b..."` — новое значение после обновления.
-
-**Возможные ошибки:**
-- 401 Unauthorized — отсутствует/неверный токен
-- 403 Forbidden — обновлять может только владелец заметки
-- 404 Not Found — заметка не найдена
-- 428 Precondition Required — отсутствует заголовок `If-Match`
-- 412 Precondition Failed — ETag не совпал (заметка была изменена)
+**Возможные ошибки:** 401, 403, 404, 428, 412.
 
 #### Получить публичные заметки
 ```http
 GET /api/pastes/public?sort={createdAt|title|viewCount}&order={asc|desc}&limit=20&offset=0
+Authorization: Bearer <jwt_token>  # Необязательно; при наличии в элементах будет `isFavorite`
 ```
 
-Параметры:
-- `sort`: createdAt (по умолчанию), title, viewCount
-- `order`: desc (по умолчанию), asc
-- `limit`: максимум заметок (по умолчанию 20, максимум 100)
-- `offset`: пропустить заметок (для пагинации)
-
-**Ответ (200 OK):** массив объектов заметок, аналогичных ответу `GET /api/pastes/{pasteId}`.
+**Ответ (200 OK):** массив `PasteDto` (при наличии токена в каждом элементе может быть `isFavorite`).
 
 #### Получить свои заметки (требует аутентификации)
 ```http
@@ -347,8 +320,11 @@ Authorization: Bearer <jwt_token>
 - `visibility`: ALL (по умолчанию), PUBLIC, UNLISTED, PRIVATE
 - `sort`: createdAt (по умолчанию), title, viewCount
 - `order`: desc (по умолчанию), asc
-- `limit`: максимум заметок (по умолчанию 20, максимум 100)
-- `offset`: пропустить заметок (для пагинации)
+- `limit`: максимум 100 (по умолчанию 20)
+- `offset`: смещение
+- `favorite`: `true` — вернуть только избранные заметки (новый параметр)
+
+**Пример:** `GET /api/pastes/my?favorite=true`
 
 #### Удалить заметку (требует аутентификации)
 ```http
@@ -356,26 +332,46 @@ DELETE /api/pastes/{pasteId}
 Authorization: Bearer <jwt_token>
 ```
 
-**Ответ (200 OK):**
-```json
-{ "message": "Paste deleted successfully" }
+**Ответ (200 OK):** `{ "message": "Paste deleted successfully" }`
+
+---
+
+### ⭐ Избранное (MVP)
+
+#### Добавить заметку в избранное
+```http
+POST /api/pastes/{pasteId}/favorite
+Authorization: Bearer <jwt_token>
 ```
 
-Возможные ошибки: 401, 403, 404.
+**Ответ (200 OK):** `{ "message": "Added to favorites" }`
+
+**Ошибки:** 401, 404 (если нет доступа к заметке)
+
+#### Удалить заметку из избранного
+```http
+DELETE /api/pastes/{pasteId}/favorite
+Authorization: Bearer <jwt_token>
+```
+
+**Ответ (200 OK):** `{ "message": "Removed from favorites" }`
+
+**Ошибки:** 401
 
 ---
 
 ## 🎯 Рекомендации для Android разработчиков
 
 ### Структура данных для UI
-В ответах API заметки содержат информацию об авторе:
+В ответах API заметки содержат информацию об авторе и флаги:
 ```json
 {
   "userId": "uuid-string",
   "authorUsername": "john_doe",
   "authorDisplayName": "John Doe",
   "updatedAt": "ISO",
-  "etag": "строка"
+  "etag": "строка",
+  "isFavorite": true
 }
 ```
 
@@ -406,8 +402,8 @@ API возвращает ошибки в формате:
 
 ## 📋 Shared модуль для Android интеграции
 
-Для упрощения интеграции создан shared модуль с общими моделями данных (Kotlinx Serialization). Актуальные поля `PasteDto`: `createdAt`, `updatedAt`, `etag`, `syntaxLanguage` и др.
+Для упрощения интеграции создан shared модуль с общими моделями данных (Kotlinx Serialization). Актуальные поля `PasteDto`: `createdAt`, `updatedAt`, `etag`, `syntaxLanguage`, `isFavorite`.
 
 ---
 
-*Документация актуализирована: 09 сентября 2025*
+*Документация актуализирована: 13 сентября 2025*

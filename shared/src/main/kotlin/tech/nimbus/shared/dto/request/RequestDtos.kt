@@ -58,3 +58,16 @@ data class UpdateProfileRequestDto(
     val username: String? = null,
     val displayName: String? = null
 )
+
+/**
+ * DTO для частичного обновления заметки.
+ * Все поля опциональны; отсутствующие поля не изменяются.
+ */
+@Serializable
+data class UpdatePasteRequestDto(
+    val title: String? = null,
+    val content: String? = null,
+    val syntaxLanguage: String? = null,
+    val visibility: PasteVisibility? = null,
+    val expiresAt: String? = null
+)

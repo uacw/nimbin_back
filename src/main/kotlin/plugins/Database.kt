@@ -109,6 +109,26 @@ fun Application.configureDatabases() {
             try { exec("ALTER TABLE pastes ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP") } catch (_: Exception) {}
         }
 
+        // NEW: favorites table (idempotent)
+        try {
+            exec(
+                """
+                CREATE TABLE IF NOT EXISTS user_favorites (
+                    user_id  VARCHAR(36) NOT NULL,
+                    paste_id VARCHAR(12) NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT pk_user_favorites PRIMARY KEY (user_id, paste_id),
+                    CONSTRAINT fk_user_favorites_user FOREIGN KEY (user_id)
+                        REFERENCES users(id) ON DELETE CASCADE,
+                    CONSTRAINT fk_user_favorites_paste FOREIGN KEY (paste_id)
+                        REFERENCES pastes(id) ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            exec("CREATE INDEX IF NOT EXISTS idx_user_favorites_user  ON user_favorites(user_id)")
+            exec("CREATE INDEX IF NOT EXISTS idx_user_favorites_paste ON user_favorites(paste_id)")
+        } catch (_: Exception) { /* idempotent */ }
+
         SchemaUtils.createMissingTablesAndColumns(UserTable, PasteTable)
     }
 }

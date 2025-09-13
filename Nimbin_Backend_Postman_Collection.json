@@ -597,6 +597,89 @@
             "description": "Редактирует заметку с ETag через If-Match. Сначала получите ETag вызовом GET /api/pastes/{{paste_id}} и вставьте его в переменную etag."
           },
           "response": []
+        },
+        {
+          "name": "Получить избранные заметки",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pastes/my?favorite=true",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pastes",
+                "my"
+              ],
+              "query": [
+                {
+                  "key": "favorite",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Возвращает только избранные заметки текущего пользователя."
+          },
+          "response": []
+        },
+        {
+          "name": "Добавить в избранное",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pastes/{{paste_id}}/favorite",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pastes",
+                "{{paste_id}}",
+                "favorite"
+              ]
+            },
+            "description": "Добавляет указанную заметку в избранное."
+          },
+          "response": []
+        },
+        {
+          "name": "Удалить из избранного",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pastes/{{paste_id}}/favorite",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pastes",
+                "{{paste_id}}",
+                "favorite"
+              ]
+            },
+            "description": "Удаляет указанную заметку из избранного."
+          },
+          "response": []
         }
       ]
     },

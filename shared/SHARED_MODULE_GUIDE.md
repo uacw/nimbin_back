@@ -39,22 +39,25 @@ data class PasteDto(
     val authorDisplayName: String? = null,   // Отображаемое имя автора
     val visibility: PasteVisibility = PasteVisibility.PUBLIC,
     val createdAt: String,
+    val updatedAt: String,                   // ✅ время последнего обновления
     val expiresAt: String? = null,
     val syntaxLanguage: String = "plaintext",
-    val viewCount: Int = 0
+    val viewCount: Int = 0,
+    val etag: String? = null,                // ✅ ETag для If-Match
+    val isFavorite: Boolean? = null          // ✅ признак избранного для текущего пользователя
 )
 ```
 
 **Использование:**
-- Backend: Конвертация из внутренних моделей в ответах API
-- Android: Отображение заметок в UI, кеширование
+- Backend: конвертация из внутренних моделей в ответах API
+- Android: отображение заметок в UI, кеширование, работа с ETag и флагом избранного
 
 ### PasteVisibility
 Enum для типов видимости заметок:
 
-- `PUBLIC` - Публичная заметка (отображается в общем списке)
-- `UNLISTED` - Скрытая заметка (доступна только по ссылке) 
-- `PRIVATE` - Приватная заметка (доступна только владельцу)
+- `PUBLIC` — Публичная заметка (отображается в общем списке)
+- `UNLISTED` — Скрытая заметка (доступна только по ссылке)
+- `PRIVATE` — Приватная заметка (доступна только владельцу)
 
 ### UserDto
 Модель пользователя для публичного API:
@@ -84,17 +87,16 @@ data class CreatePasteRequestDto(
 )
 ```
 
-**Валидация в Android:**
+### UpdatePasteRequestDto (частичное обновление)
 ```kotlin
-fun validateCreatePasteRequest(request: CreatePasteRequestDto): List<String> {
-    val errors = mutableListOf<String>()
-    
-    if (request.title.isBlank()) errors.add("Title cannot be empty")
-    if (request.title.length > 255) errors.add("Title too long (max 255 characters)")
-    if (request.content.isBlank()) errors.add("Content cannot be empty")
-    
-    return errors
-}
+@Serializable
+data class UpdatePasteRequestDto(
+    val title: String? = null,
+    val content: String? = null,
+    val syntaxLanguage: String? = null,
+    val visibility: PasteVisibility? = null,
+    val expiresAt: String? = null
+)
 ```
 
 ### RegisterRequestDto
@@ -146,19 +148,28 @@ data class UserProfileDto(
 )
 ```
 
-## API Client Interface
+## API: избранное и ETag
 
-### NimbinApiClient
+- ETag: `GET /api/pastes/{id}` возвращает заголовок `ETag` и поле `etag` в `PasteDto`. Для `PUT /api/pastes/{id}` используйте `If-Match`.
+- Избранное:
+  - `POST /api/pastes/{id}/favorite` — добавить в избранное
+  - `DELETE /api/pastes/{id}/favorite` — удалить из избранного
+  - `GET /api/pastes/my?favorite=true` — только избранные заметки пользователя
+  - Поле `isFavorite` в `PasteDto` будет проставлено при запросах с токеном
+
+## API Client Interface (пример)
+
 ```kotlin
 interface NimbinApiClient {
     suspend fun login(request: LoginRequestDto): ApiResult<AuthResponseDto>
     suspend fun register(request: RegisterRequestDto): ApiResult<AuthResponseDto>
     suspend fun createPaste(request: CreatePasteRequestDto, token: String?): ApiResult<PasteDto>
     suspend fun getPaste(id: String, token: String?): ApiResult<PasteDto>
-    suspend fun getPublicPastes(limit: Int, offset: Int): ApiResult<List<PasteDto>>
-    suspend fun getMyPastes(token: String, visibility: String?): ApiResult<List<PasteDto>>
-    suspend fun getUserProfile(token: String): ApiResult<UserProfileDto>
-    suspend fun updateProfile(request: UpdateProfileRequestDto, token: String): ApiResult<UserDto>
+    suspend fun getPublicPastes(limit: Int, offset: Int, token: String?): ApiResult<List<PasteDto>>
+    suspend fun getMyPastes(token: String, favoriteOnly: Boolean = false): ApiResult<List<PasteDto>>
+    suspend fun updatePaste(id: String, body: UpdatePasteRequestDto, token: String, etag: String): ApiResult<PasteDto>
+    suspend fun addFavorite(id: String, token: String): ApiResult<Unit>
+    suspend fun removeFavorite(id: String, token: String): ApiResult<Unit>
 }
 ```
 
@@ -184,4 +195,3 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
 }
 ```
-

@@ -21,6 +21,7 @@ import kotlinx.serialization.Serializable
  * @property language Язык программирования для подсветки синтаксиса
  * @property viewCount Счетчик просмотров заметки
  * @property etag Этикетка версии заметки (для оптимистичной блокировки)
+ * @property isFavorite Признак, что заметка в избранном у текущего пользователя
  */
 @Serializable
 data class PasteDto(
@@ -36,5 +37,6 @@ data class PasteDto(
     val expiresAt: String? = null,
     val syntaxLanguage: String = "plaintext",
     val viewCount: Int = 0,
-    val etag: String? = null
+    val etag: String? = null,
+    val isFavorite: Boolean? = null
 )

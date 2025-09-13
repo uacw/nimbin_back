@@ -15,13 +15,16 @@ import tech.nimbus.exceptions.*
 import tech.nimbus.models.Paste
 import java.time.LocalDateTime
 import tech.nimbus.utils.DtoConverters.normalizeSyntaxLanguage
+import tech.nimbus.database.repositories.FavoritesRepository
+import tech.nimbus.database.repositories.interfaces.IFavoritesRepository
 
 /**
  * Сервис для работы с заметками.
  * Содержит бизнес-логику, валидацию и обработку ошибок.
  */
 class PasteService(
-    private val repository: IPasteRepository = PasteRepository()
+    private val repository: IPasteRepository = PasteRepository(),
+    private val favorites: IFavoritesRepository = FavoritesRepository()
 ) {
 
     /**
@@ -30,14 +33,19 @@ class PasteService(
     suspend fun getPublicPastes(
         limit: Int,
         offset: Int,
-        sortOrder: PasteSortOrder
+        sortOrder: PasteSortOrder,
+        currentUserId: String? = null
     ): List<PasteDto> {
         validatePaginationParams(limit, offset)
 
         try {
             val pastesWithAuthors = repository.getPublicPastesWithAuthors(limit, offset, sortOrder)
+            val favoriteSet: Set<String> = if (currentUserId != null) {
+                favorites.listFavoritePasteIds(currentUserId, limit = 1000, offset = 0).toSet()
+            } else emptySet()
+
             return pastesWithAuthors.map { (paste, author) ->
-                paste.toPasteDtoWithAuthor(author)
+                paste.toPasteDtoWithAuthor(author, isFavorite = paste.id in favoriteSet)
             }
         } catch (e: Exception) {
             throw DatabaseException.QueryFailed("getPublicPastesWithAuthors", e)
@@ -61,7 +69,8 @@ class PasteService(
             // Увеличиваем счетчик просмотров
             repository.incrementViewCount(pasteId)
 
-            return pasteWithAuthor.paste.toPasteDtoWithAuthor(pasteWithAuthor.author)
+            val isFav = if (userId != null) favorites.isFavorite(userId, pasteId) else null
+            return pasteWithAuthor.paste.toPasteDtoWithAuthor(pasteWithAuthor.author, isFavorite = isFav)
         } catch (e: Exception) {
             throw DatabaseException.QueryFailed("getPasteWithAuthor", e)
         }
@@ -102,9 +111,9 @@ class PasteService(
             // Возвращаем созданную заметку с информацией об авторе
             val pasteWithAuthor = repository.getPasteWithAuthor(created.id)
             return if (pasteWithAuthor != null) {
-                pasteWithAuthor.paste.toPasteDtoWithAuthor(pasteWithAuthor.author)
+                pasteWithAuthor.paste.toPasteDtoWithAuthor(pasteWithAuthor.author, isFavorite = false)
             } else {
-                created.toPasteDto()
+                created.toPasteDto(isFavorite = false)
             }
         } catch (e: PasteException) {
             throw e
@@ -120,14 +129,28 @@ class PasteService(
         userId: String,
         limit: Int,
         offset: Int,
-        sortOrder: PasteSortOrder = PasteSortOrder.NEWEST_FIRST
+        sortOrder: PasteSortOrder = PasteSortOrder.NEWEST_FIRST,
+        favoriteOnly: Boolean = false
     ): List<PasteDto> {
         validatePaginationParams(limit, offset)
         validateUserId(userId)
 
         try {
+            if (favoriteOnly) {
+                val ids = favorites.listFavoritePasteIds(userId, limit, offset)
+                val result = mutableListOf<PasteDto>()
+                for (id in ids) {
+                    val p = repository.getPasteById(id) ?: continue
+                    // Фильтрация на случай, если чужая приватная
+                    if (!repository.canAccessPaste(id, userId)) continue
+                    result.add(p.toPasteDto(isFavorite = true))
+                }
+                return result
+            }
+
             val userPastes = repository.getUserPastes(userId, null, limit, offset, sortOrder)
-            return userPastes.map { it.toPasteDto() }
+            val favoriteSet = favorites.listFavoritePasteIds(userId, limit = 1000, offset = 0).toSet()
+            return userPastes.map { it.toPasteDto(isFavorite = it.id in favoriteSet) }
         } catch (e: Exception) {
             throw DatabaseException.QueryFailed("getUserPastes", e)
         }

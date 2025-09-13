@@ -24,12 +24,17 @@
 - Возможность редактирования профиля
 
 ### 📝 **Система заметок с уровнями приватности**
-- **PUBLIC** - публичные заметки, видимые всем
-- **UNLISTED** - доступны только по прямой ссылке
-- **PRIVATE** - личные заметки, видимые только владельцу
+- **PUBLIC** — публичные заметки, видимые всем
+- **UNLISTED** — доступны только по прямой ссылке
+- **PRIVATE** — личные заметки, видимые только владельцу
 - Поддержка синтаксической подсветки для разных языков
 - Автоматический счетчик просмотров
 - Опциональное время истечения заметок
+
+### ⭐ **Избранное (MVP)**
+- Добавление/удаление заметок в «Избранное»
+- Флаг `isFavorite` в ответах (при запросе с токеном)
+- Фильтр моих заметок по избранному (`?favorite=true`)
 
 ### 🔍 **Расширенные возможности**
 - Пагинация для всех списков
@@ -72,20 +77,22 @@
 ## 📋 Основные API Endpoints
 
 ### Аутентификация
-- `POST /api/auth/register` - Регистрация нового пользователя
-- `POST /api/auth/login` - Вход по email и паролю
+- `POST /api/auth/register` — Регистрация нового пользователя
+- `POST /api/auth/login` — Вход по email и паролю
 
 ### Пользовательские профили
-- `GET /api/users/{userId}` - Публичный профиль пользователя
-- `GET /api/users/profile` - Получить свой профиль
-- `PUT /api/users/profile` - Обновить профиль
+- `GET /api/users/{userId}` — Публичный профиль пользователя
+- `GET /api/users/profile` — Получить свой профиль
+- `PUT /api/users/profile` — Обновить профиль
 
 ### Управление заметками
-- `POST /api/pastes` - Создать новую заметку
-- `GET /api/pastes/{id}` - Получить заметку по ID
-- `GET /api/pastes/public` - Список публичных заметок
-- `GET /api/pastes/my` - Мои заметки с фильтрацией
-- `DELETE /api/pastes/{id}` - Удалить заметку
+- `POST /api/pastes` — Создать новую заметку
+- `GET /api/pastes/{id}` — Получить заметку по ID
+- `GET /api/pastes/public` — Список публичных заметок (при наличии токена элементы содержат `isFavorite`)
+- `GET /api/pastes/my` — Мои заметки с фильтрацией (поддерживает `?favorite=true`)
+- `POST /api/pastes/{id}/favorite` — Добавить заметку в избранное
+- `DELETE /api/pastes/{id}/favorite` — Удалить заметку из избранного
+- `DELETE /api/pastes/{id}` — Удалить заметку
 
 ### Дополнительные возможности
 - Пагинация: `?limit=20&offset=0`
@@ -96,68 +103,47 @@
 
 Проект следует принципам **Clean Architecture** с четким разделением слоев:
 
-- **API Layer** - REST endpoints с валидацией
-- **Service Layer** - Бизнес-логика и JWT сервисы
-- **Repository Layer** - Доступ к данным через Exposed ORM  
-- **Database Layer** - PostgreSQL с оптимизированными запросами
+- **API Layer** — REST endpoints с валидацией
+- **Service Layer** — Бизнес-логика и JWT сервисы
+- **Repository Layer** — Доступ к данным через Exposed ORM  
+- **Database Layer** — PostgreSQL с оптимизированными запросами
 
 ## 📱 Интеграция с Android
 
 ### Shared модуль
 Для упрощения разработки Android приложения создан **shared модуль** с готовыми:
-- DTO моделями для всех API запросов
+- DTO моделями для всех API запросов (включая `UpdatePasteRequestDto`)
 - Enum'ами и константами
 - Сериализацией через Kotlinx Serialization
 
-### Быстрый старт для Android разработчиков
-1. Клонируйте репозиторий
-2. Добавьте shared модуль в ваш Android проект
-3. Используйте готовые DTO для API запросов
-4. Настройте JWT токен менеджмент
-
 ## 🧪 Качество кода
 
-- **87% покрытие тестами** - Unit тесты для всех компонентов
-- **Kotlin Code Style** - соответствие стандартам Kotlin
-- **Type Safety** - использование Exposed ORM для типобезопасности
-- **Error Handling** - централизованная обработка ошибок
-- **Documentation** - подробная документация API
+- **87% покрытие тестами** — Unit тесты для всех компонентов
+- **Kotlin Code Style** — соответствие стандартам Kotlin
+- **Type Safety** — использование Exposed ORM для типобезопасности
+- **Error Handling** — централизованная обработка ошибок
+- **Documentation** — подробная документация API
 
 ## 📖 Документация
 
-- **[API Documentation](API_DOCUMENTATION.md)** - Полная документация всех endpoints с примерами
-- **[Shared Module Guide](shared/SHARED_MODULE_GUIDE.md)** - Руководство по интеграции shared модуля
-- **[Postman Collection](Nimbin_Backend_Postman_Collection.json)** - Готовая коллекция для тестирования
+- **[API Documentation](API_DOCUMENTATION.md)** — Полная документация endpoints (включая ETag и Избранное)
+- **[Shared Module Guide](shared/SHARED_MODULE_GUIDE.md)** — Руководство по интеграции shared модуля
+- **[Postman Collection](Nimbin_Backend_Postman_Collection.json)** — Готовая коллекция для тестирования
 
 ## 🛠️ Для разработчиков
 
-### Локальная разработка
-```bash
-# Клонирование репозитория
-git clone <repository-url>
-cd Nimbin_back
-
-# Запуск тестов
-./gradlew test
-
-# Локальный запуск
-./gradlew run
-```
-
-### Deployment
-Проект автоматически разворачивается на Heroku при пуше в main ветку.
+Смотри API_DOCUMENTATION.md для деталей запуска и ETag.
 
 ## 🎯 Использование
 
-Этот backend идеально подходит для:
-- **Android приложений** типа Pastebin/Ghostbin
-- **Обмена кодом** и текстовыми заметками в команде
-- **Изучения архитектуры** современных Kotlin/Ktor приложений
-- **Стажировочных проектов** с реальным production deployment
+Этот backend подходит для:
+- Android приложений типа Pastebin/Ghostbin
+- Обмена кодом и текстовыми заметками
+- Изучения архитектуры Kotlin/Ktor
+- Стажировочных проектов с production деплоем
 
 ## 📞 Контакты
 
 **Production API**: `https://nimbin-back-1de949af6629.herokuapp.com`
 
-Проект создан для демонстрации навыков backend разработки на Kotlin/Ktor со всеми современными практиками и готовностью к production использованию.
-
+Проект создан для демонстрации навыков backend разработки на Kotlin/Ktor со современными практиками и готовностью к production.
