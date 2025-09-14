@@ -9,4 +9,3 @@ interface IFavoritesRepository {
     suspend fun isFavorite(userId: String, pasteId: String): Boolean
     suspend fun listFavoritePasteIds(userId: String, limit: Int = 100, offset: Int = 0): List<String>
 }
-

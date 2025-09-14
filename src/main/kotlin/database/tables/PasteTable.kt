@@ -32,8 +32,10 @@ object PasteTable : Table("pastes") {
 
     /** Язык подсветки синтаксиса */
     val syntaxLanguage  = varchar("syntax_language", 50).default("plaintext")
-
     val viewCount = integer("view_count").default(0)
+
+    // Новый столбец для гостевого режима
+    val guestId  = varchar("guest_id", 36).nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

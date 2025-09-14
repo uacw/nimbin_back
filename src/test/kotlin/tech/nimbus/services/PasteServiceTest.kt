@@ -129,7 +129,7 @@ class PasteServiceTest {
             // Arrange
             val now = LocalDateTime.now().toString()
             val testPaste = Paste(
-                id = "validPaste12", // 12 символов
+                id = "validPaste12",
                 title = "Test Paste",
                 content = "Content",
                 userId = "user1",
@@ -138,15 +138,9 @@ class PasteServiceTest {
                 updatedAt = now,
                 syntaxLanguage = "plaintext"
             )
-
             val pasteWithAuthor = PasteWithAuthor(testPaste, null)
-
-            whenever(mockRepository.canAccessPaste("validPaste12", "user1"))
-                .thenReturn(true)
-            whenever(mockRepository.getPasteWithAuthor("validPaste12"))
-                .thenReturn(pasteWithAuthor)
-            whenever(mockRepository.incrementViewCount("validPaste12"))
-                .thenReturn(Unit)
+            whenever(mockRepository.getPasteWithAuthor("validPaste12")).thenReturn(pasteWithAuthor)
+            whenever(mockRepository.incrementViewCount("validPaste12")).thenReturn(Unit)
 
             // Act
             val result = pasteService.getPasteById("validPaste12", "user1")
@@ -156,7 +150,6 @@ class PasteServiceTest {
             assertEquals("Test Paste", result?.title)
             assertEquals("plaintext", result?.syntaxLanguage)
 
-            verify(mockRepository).canAccessPaste("validPaste12", "user1")
             verify(mockRepository).getPasteWithAuthor("validPaste12")
             verify(mockRepository).incrementViewCount("validPaste12")
         }
@@ -164,9 +157,19 @@ class PasteServiceTest {
         @Test
         @DisplayName("Should return null when access is not allowed")
         fun shouldReturnNullWhenAccessIsNotAllowed() = runTest {
-            // Arrange
-            whenever(mockRepository.canAccessPaste("privatePas12", "user2"))
-                .thenReturn(false)
+            // Arrange: приватная паста другого пользователя
+            val now = LocalDateTime.now().toString()
+            val privateForeign = Paste(
+                id = "privatePas12",
+                title = "Private",
+                content = "Secret",
+                userId = "owner",
+                visibility = PasteVisibility.PRIVATE,
+                createdAt = now,
+                updatedAt = now,
+                syntaxLanguage = "plaintext"
+            )
+            whenever(mockRepository.getPasteWithAuthor("privatePas12")).thenReturn(PasteWithAuthor(privateForeign, null))
 
             // Act
             val result = pasteService.getPasteById("privatePas12", "user2")
@@ -178,7 +181,6 @@ class PasteServiceTest {
         @Test
         @DisplayName("Should throw InvalidPasteId for invalid ID format")
         fun shouldThrowInvalidPasteIdForInvalidIdFormat() = runTest {
-            // Act & Assert
             assertThrows<PasteException.InvalidPasteId> {
                 pasteService.getPasteById("invalid", "user1")
             }
@@ -188,10 +190,7 @@ class PasteServiceTest {
         @DisplayName("Should return null when paste doesn't exist")
         fun shouldReturnNullWhenPasteDoesntExist() = runTest {
             // Arrange
-            whenever(mockRepository.canAccessPaste("validPaste12", "user1"))
-                .thenReturn(true)
-            whenever(mockRepository.getPasteWithAuthor("validPaste12"))
-                .thenReturn(null)
+            whenever(mockRepository.getPasteWithAuthor("validPaste12")).thenReturn(null)
 
             // Act
             val result = pasteService.getPasteById("validPaste12", "user1")

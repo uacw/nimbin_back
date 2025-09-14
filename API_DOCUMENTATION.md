@@ -407,3 +407,24 @@ API возвращает ошибки в формате:
 ---
 
 *Документация актуализирована: 13 сентября 2025*
+
+---
+
+## Гостевой режим (Guest)
+
+- Назначение: дать пользователю временный JWT без регистрации.
+- Новый эндпоинт:
+  - POST /api/auth/guest
+    - Без авторизации.
+    - Ответ 201 Created:
+      {
+        "token": "<jwt>",
+        "user": {
+          "id": "<guestId>",
+          "username": "guest-xxxxxxxx",
+          "displayName": null,
+          "email": "",
+          "createdAt": "ISO"
+        }
+      }
+    - Токен содержит claims: { guestId, isGuest=true }.

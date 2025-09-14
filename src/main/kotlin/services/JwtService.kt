@@ -38,6 +38,27 @@ class JwtService(
         .withIssuer(issuer)
         .withAudience(audience)
         .withClaim("userId", userId)
+        .withClaim("isGuest", false)
         .withExpiresAt(Date(System.currentTimeMillis() + 24 * 3600_000))
+        .sign(algorithm)
+
+    /**
+     * Генерирует гостевой JWT токен.
+     *
+     * Создает подписанный JWT токен с информацией для гостевого доступа.
+     * Токен действителен в течение 30 дней с момента создания.
+     *
+     * @param guestId Уникальный идентификатор гостя
+     * @param ttlMillis Время жизни токена в миллисекундах (по умолчанию 30 дней)
+     * @return Подписанный гостевой JWT токен в виде строки
+     *
+     * @sample generateGuestToken("guest-uuid-here") // "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+     */
+    fun generateGuestToken(guestId: String, ttlMillis: Long = 30L * 24 * 3600_000): String = JWT.create()
+        .withIssuer(issuer)
+        .withAudience(audience)
+        .withClaim("guestId", guestId)
+        .withClaim("isGuest", true)
+        .withExpiresAt(Date(System.currentTimeMillis() + ttlMillis))
         .sign(algorithm)
 }

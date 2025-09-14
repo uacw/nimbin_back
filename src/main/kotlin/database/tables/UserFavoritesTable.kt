@@ -12,7 +12,8 @@ object UserFavoritesTable : Table("user_favorites") {
     val userId  = varchar("user_id", 36)
     val pasteId = varchar("paste_id", 12)
     val createdAt = datetime("created_at").default(LocalDateTime.now())
+    // Новый столбец для гостевого избранного
+    val guestId = varchar("guest_id", 36).nullable()
 
     override val primaryKey = PrimaryKey(userId, pasteId)
 }
-

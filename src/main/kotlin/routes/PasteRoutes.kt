@@ -7,6 +7,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import tech.nimbus.routes.utils.getCurrentUserId
+import tech.nimbus.routes.utils.getCurrentGuestId
 import tech.nimbus.routes.utils.getPaginationParams
 import tech.nimbus.routes.utils.getSortOrder
 import tech.nimbus.routes.utils.respondError
@@ -64,7 +65,8 @@ fun Route.pasteRoutes() {
                         )
 
                     val userId = call.getCurrentUserId()
-                    val pasteDto = pasteService.getPasteById(id, userId)
+                    val guestId = call.getCurrentGuestId()
+                    val pasteDto = pasteService.getPasteById(id, userId, guestId)
 
                     if (pasteDto != null) {
                         pasteDto.etag?.let { etag ->
@@ -87,8 +89,9 @@ fun Route.pasteRoutes() {
                 call.safeExecute {
                     val request = call.receive<CreatePasteRequestDto>()
                     val userId = call.getCurrentUserId()
+                    val guestId = call.getCurrentGuestId()
 
-                    val createdPaste = pasteService.createPaste(request, userId)
+                    val createdPaste = pasteService.createPaste(request, userId, guestId)
                     call.respond(HttpStatusCode.Created, createdPaste)
                 }
             }
@@ -99,24 +102,43 @@ fun Route.pasteRoutes() {
             get("/my") {
                 call.safeExecute {
                     val userId = call.getCurrentUserId()
-                        ?: return@safeExecute call.respondError(
-                            HttpStatusCode.Unauthorized,
-                            "Authentication required"
-                        )
+                    val guestId = call.getCurrentGuestId()
 
                     val pagination = call.getPaginationParams()
                     val sortOrder = call.getSortOrder()
                     val favoriteOnly = call.request.queryParameters["favorite"]?.let { it.equals("true", true) } ?: false
 
-                    val userPastes = pasteService.getUserPastes(
-                        userId = userId,
-                        limit = pagination.limit,
-                        offset = pagination.offset,
-                        sortOrder = sortOrder,
-                        favoriteOnly = favoriteOnly
-                    )
-
-                    call.respond(HttpStatusCode.OK, userPastes)
+                    when {
+                        userId != null -> {
+                            val userPastes = pasteService.getUserPastes(
+                                userId = userId,
+                                limit = pagination.limit,
+                                offset = pagination.offset,
+                                sortOrder = sortOrder,
+                                favoriteOnly = favoriteOnly
+                            )
+                            call.respond(HttpStatusCode.OK, userPastes)
+                        }
+                        guestId != null -> {
+                            if (favoriteOnly) {
+                                // Избранное для гостя пока не поддержано на уровне БД
+                                return@safeExecute call.respondError(HttpStatusCode.NotImplemented, "Guest favorites not supported yet")
+                            }
+                            val guestPastes = pasteService.getGuestPastes(
+                                guestId = guestId,
+                                limit = pagination.limit,
+                                offset = pagination.offset,
+                                sortOrder = sortOrder
+                            )
+                            call.respond(HttpStatusCode.OK, guestPastes)
+                        }
+                        else -> {
+                            return@safeExecute call.respondError(
+                                HttpStatusCode.Unauthorized,
+                                "Authentication required"
+                            )
+                        }
+                    }
                 }
             }
 
@@ -163,12 +185,13 @@ fun Route.pasteRoutes() {
                         )
 
                     val userId = call.getCurrentUserId()
-                        ?: return@safeExecute call.respondError(
-                            HttpStatusCode.Unauthorized,
-                            "Authentication required"
-                        )
+                    val guestId = call.getCurrentGuestId()
 
-                    val deleted = pasteService.deletePaste(id, userId)
+                    val deleted = when {
+                        userId != null -> pasteService.deletePaste(id, userId)
+                        guestId != null -> pasteRepository.deletePasteByGuest(id, guestId)
+                        else -> false
+                    }
 
                     if (deleted) {
                         call.respond(
@@ -191,13 +214,17 @@ fun Route.pasteRoutes() {
                         ?: return@safeExecute call.respondError(HttpStatusCode.BadRequest, "Missing paste ID")
 
                     val userId = call.getCurrentUserId()
-                        ?: return@safeExecute call.respondError(HttpStatusCode.Unauthorized, "Authentication required")
+                    val guestId = call.getCurrentGuestId()
 
-                    // Проверяем, что заметка существует и принадлежит пользователю
                     val existing = pasteRepository.getPasteById(id)
                         ?: return@safeExecute call.respondError(HttpStatusCode.NotFound, "Paste not found")
 
-                    if (existing.userId == null || existing.userId != userId) {
+                    val ownerOk = when {
+                        userId != null -> existing.userId == userId
+                        guestId != null -> existing.userId == null && existing.guestId == guestId
+                        else -> false
+                    }
+                    if (!ownerOk) {
                         return@safeExecute call.respondError(HttpStatusCode.Forbidden, "Only the owner can update the paste")
                     }
 
@@ -217,7 +244,6 @@ fun Route.pasteRoutes() {
                         expectedEtag = ifMatch
                     ) ?: return@safeExecute call.respondError(HttpStatusCode.PreconditionFailed, "ETag mismatch or update rejected")
 
-                    // Перечитываем с автором и возвращаем согласованный DTO
                     val withAuthor = pasteRepository.getPasteWithAuthor(id)
                     val dto = withAuthor?.paste?.toPasteDtoWithAuthor(withAuthor.author)
                         ?: updated.let { it.toPasteDtoWithAuthor(null) }

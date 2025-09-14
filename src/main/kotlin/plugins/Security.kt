@@ -26,10 +26,15 @@ fun Application.configureSecurity() {
                     .build()
             )
             validate { credential ->
-                if (credential.payload.getClaim("userId").asString() != null) {
-                    JWTPrincipal(credential.payload)
-                } else {
-                    null
+                val payload = credential.payload
+                val userId = payload.getClaim("userId").asString()
+                val guestId = payload.getClaim("guestId").asString()
+                val isGuest = runCatching { payload.getClaim("isGuest").asBoolean() }.getOrNull() ?: false
+
+                when {
+                    userId != null && !isGuest -> JWTPrincipal(payload)
+                    guestId != null && isGuest -> JWTPrincipal(payload)
+                    else -> null
                 }
             }
             challenge { _, _ ->

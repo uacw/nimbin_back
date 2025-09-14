@@ -12,10 +12,12 @@ import tech.nimbus.services.JwtService
 import tech.nimbus.shared.dto.request.RegisterRequestDto
 import tech.nimbus.shared.dto.request.LoginRequestDto
 import tech.nimbus.shared.dto.AuthResponseDto
+import tech.nimbus.shared.dto.UserDto
 import tech.nimbus.utils.DtoConverters.toUserDto
 import tech.nimbus.validation.ValidationService
 import tech.nimbus.exceptions.*
 import java.util.UUID
+import java.time.LocalDateTime
 
 /**
  * Роуты для аутентификации с улучшенной валидацией и обработкой ошибок.
@@ -26,6 +28,25 @@ import java.util.UUID
 fun Route.authRoutes(jwtService: JwtService, userRepository: UserRepository) {
 
     route("/api/auth") {
+
+        // Новый гостевой вход: POST /api/auth/guest
+        post("/guest") {
+            call.safeExecute {
+                val guestId = UUID.randomUUID().toString()
+                val token = jwtService.generateGuestToken(guestId)
+
+                // Синтетический пользователь только для ответа (не сохраняется в БД)
+                val nowIso = LocalDateTime.now().toString()
+                val guestUser = UserDto(
+                    id = guestId,
+                    username = "guest-" + guestId.substring(0, 8),
+                    displayName = null,
+                    email = "",
+                    createdAt = nowIso
+                )
+                call.respond(HttpStatusCode.Created, AuthResponseDto(token, guestUser))
+            }
+        }
 
         // POST /api/auth/register - регистрация
         post("/register") {

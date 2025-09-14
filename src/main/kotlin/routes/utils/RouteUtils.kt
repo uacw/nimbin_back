@@ -77,6 +77,13 @@ fun ApplicationCall.getCurrentUserId(): String? {
 }
 
 /**
+ * Получить ID гостя из JWT токена.
+ */
+fun ApplicationCall.getCurrentGuestId(): String? {
+    return principal<JWTPrincipal>()?.payload?.getClaim("guestId")?.asString()
+}
+
+/**
  * Безопасный способ отправки ответа об ошибке.
  */
 suspend fun ApplicationCall.respondError(

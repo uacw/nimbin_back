@@ -88,3 +88,33 @@ CREATE TABLE IF NOT EXISTS user_favorites (
 -- Helpful indexes (if you frequently filter by user or paste)
 CREATE INDEX IF NOT EXISTS idx_user_favorites_user  ON user_favorites(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_favorites_paste ON user_favorites(paste_id);
+
+-- === Guest mode groundwork: add guest_id columns and indexes (idempotent) ===
+
+-- 1) pastes.guest_id
+ALTER TABLE pastes ADD COLUMN IF NOT EXISTS guest_id VARCHAR(36);
+CREATE INDEX IF NOT EXISTS idx_pastes_guest_id ON pastes(guest_id);
+
+-- 2) user_favorites.guest_id (keep existing schema; do not drop PK)
+ALTER TABLE user_favorites ADD COLUMN IF NOT EXISTS guest_id VARCHAR(36);
+CREATE INDEX IF NOT EXISTS idx_user_favorites_guest_id ON user_favorites(guest_id);
+
+-- 3) Unique constraints to prevent duplicates for user and guest separately
+DO $$
+BEGIN
+    -- If primary key already enforces (user_id, paste_id), we skip creating a redundant unique index for user
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'user_favorites_pkey'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'ux_user_favorites_user'
+    ) THEN
+        EXECUTE 'CREATE UNIQUE INDEX ux_user_favorites_user ON user_favorites(user_id, paste_id) WHERE user_id IS NOT NULL';
+    END IF;
+
+    -- Unique for guest favorites
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'ux_user_favorites_guest'
+    ) THEN
+        EXECUTE 'CREATE UNIQUE INDEX ux_user_favorites_guest ON user_favorites(guest_id, paste_id) WHERE guest_id IS NOT NULL';
+    END IF;
+END$$;

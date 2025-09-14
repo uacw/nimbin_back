@@ -110,6 +110,44 @@
             "description": "Тестирует обработку неверного email или пароля. Должен вернуть 401."
           },
           "response": []
+        },
+        {
+          "name": "Гостевой вход (POST /api/auth/guest)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/guest",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "guest"
+              ]
+            },
+            "description": "Создаёт гостевой JWT (claims: guestId, isGuest=true). Токен сохраняется в переменную {{jwt_token}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "var json = pm.response.json();",
+                  "if (json && json.token) { pm.collectionVariables.set('jwt_token', json.token); }",
+                  "if (json && json.user && json.user.id) { pm.collectionVariables.set('guest_id', json.user.id); }"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

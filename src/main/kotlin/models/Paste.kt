@@ -32,5 +32,7 @@ data class Paste(
     val updatedAt: String,             // ISO-строка
     val expiresAt: String? = null,
     val syntaxLanguage: String = "plaintext",
-    val viewCount: Int = 0
+    val viewCount: Int = 0,
+    // Новый владелец для гостя (вместо userId)
+    val guestId: String? = null
 )

@@ -61,6 +61,17 @@ interface IPasteRepository {
     ): List<Paste>
 
     /**
+     * Получает заметки гостя.
+     */
+    suspend fun getGuestPastes(
+        guestId: String,
+        visibility: PasteVisibility? = null,
+        limit: Int = 20,
+        offset: Int = 0,
+        sortOrder: PasteSortOrder = PasteSortOrder.NEWEST_FIRST
+    ): List<Paste>
+
+    /**
      * Получает публичные заметки пользователя с информацией об авторе.
      */
     suspend fun getUserPublicPastes(
@@ -94,6 +105,11 @@ interface IPasteRepository {
      * Удаляет заметку пользователя.
      */
     suspend fun deletePaste(pasteId: String, userId: String): Boolean
+
+    /**
+     * Удаляет заметку гостя.
+     */
+    suspend fun deletePasteByGuest(pasteId: String, guestId: String): Boolean
 
     /**
      * Обновляет заметку с проверкой ETag.

@@ -57,6 +57,7 @@ class PasteRepository : IPasteRepository {
             it[title]      = paste.title
             it[content]    = paste.content
             it[userId]     = paste.userId
+            it[PasteTable.guestId] = paste.guestId
             it[visibility] = paste.visibility
             it[createdAt]  = LocalDateTime.parse(paste.createdAt)
             it[updatedAt]  = LocalDateTime.parse(paste.updatedAt)
@@ -279,6 +280,37 @@ class PasteRepository : IPasteRepository {
     }
 
     /**
+     * Получает заметки гостя с фильтрацией и сортировкой.
+     */
+    override suspend fun getGuestPastes(
+        guestId: String,
+        visibility: PasteVisibility?,
+        limit: Int,
+        offset: Int,
+        sortOrder: PasteSortOrder
+    ): List<Paste> = transaction {
+        var query = PasteTable.selectAll()
+            .where { PasteTable.guestId eq guestId }
+
+        visibility?.let { vis ->
+            query = query.andWhere { PasteTable.visibility eq vis }
+        }
+
+        val sortedQuery = when (sortOrder) {
+            PasteSortOrder.NEWEST_FIRST -> query.orderBy(PasteTable.createdAt, SortOrder.DESC)
+            PasteSortOrder.OLDEST_FIRST -> query.orderBy(PasteTable.createdAt, SortOrder.ASC)
+            PasteSortOrder.MOST_VIEWED -> query.orderBy(PasteTable.viewCount, SortOrder.DESC)
+            PasteSortOrder.LEAST_VIEWED -> query.orderBy(PasteTable.viewCount, SortOrder.ASC)
+            PasteSortOrder.TITLE_ASC -> query.orderBy(PasteTable.title, SortOrder.ASC)
+            PasteSortOrder.TITLE_DESC -> query.orderBy(PasteTable.title, SortOrder.DESC)
+        }
+
+        sortedQuery
+            .limit(limit, offset.toLong())
+            .map { row -> mapRowToPaste(row) }
+    }
+
+    /**
      * Подсчитывает общее количество публичных заметок.
      */
     override suspend fun getPublicPastesCount(): Long = transaction {
@@ -316,6 +348,15 @@ class PasteRepository : IPasteRepository {
     override suspend fun deletePaste(pasteId: String, userId: String): Boolean = transaction {
         PasteTable.deleteWhere {
             (PasteTable.id eq pasteId) and (PasteTable.userId eq userId)
+        } > 0
+    }
+
+    /**
+     * Удаляет заметку по guestId.
+     */
+    override suspend fun deletePasteByGuest(pasteId: String, guestId: String): Boolean = transaction {
+        PasteTable.deleteWhere {
+            (PasteTable.id eq pasteId) and (PasteTable.guestId eq guestId)
         } > 0
     }
 
@@ -372,7 +413,8 @@ class PasteRepository : IPasteRepository {
             updatedAt = row[PasteTable.updatedAt].toString(),
             expiresAt = row[PasteTable.expiresAt]?.toString(),
             syntaxLanguage = row[PasteTable.syntaxLanguage],
-            viewCount = row[PasteTable.viewCount]
+            viewCount = row[PasteTable.viewCount],
+            guestId = row[PasteTable.guestId]
         )
     }
 }

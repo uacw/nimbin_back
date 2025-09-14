@@ -17,6 +17,7 @@ import java.time.LocalDateTime
 import tech.nimbus.utils.DtoConverters.normalizeSyntaxLanguage
 import tech.nimbus.database.repositories.FavoritesRepository
 import tech.nimbus.database.repositories.interfaces.IFavoritesRepository
+import tech.nimbus.models.PasteVisibility
 
 /**
  * Сервис для работы с заметками.
@@ -53,24 +54,26 @@ class PasteService(
     }
 
     /**
-     * Получить заметку по ID с проверкой доступа.
+     * Получить заметку по ID с проверкой доступа (учитывает гостя).
      */
-    suspend fun getPasteById(pasteId: String, userId: String?): PasteDto? {
+    suspend fun getPasteById(pasteId: String, userId: String?, guestId: String? = null): PasteDto? {
         validatePasteId(pasteId)
 
         try {
-            if (!repository.canAccessPaste(pasteId, userId)) {
-                return null // Вместо исключения возвращаем null для совместимости с роутами
+            val pasteWithAuthor = repository.getPasteWithAuthor(pasteId) ?: return null
+            val paste = pasteWithAuthor.paste
+            val accessAllowed = when (paste.visibility) {
+                PasteVisibility.PUBLIC, PasteVisibility.UNLISTED -> true
+                PasteVisibility.PRIVATE -> (paste.userId != null && paste.userId == userId) ||
+                    (paste.userId == null && paste.guestId != null && paste.guestId == guestId)
             }
-
-            val pasteWithAuthor = repository.getPasteWithAuthor(pasteId)
-                ?: return null
+            if (!accessAllowed) return null
 
             // Увеличиваем счетчик просмотров
             repository.incrementViewCount(pasteId)
 
             val isFav = if (userId != null) favorites.isFavorite(userId, pasteId) else null
-            return pasteWithAuthor.paste.toPasteDtoWithAuthor(pasteWithAuthor.author, isFavorite = isFav)
+            return paste.toPasteDtoWithAuthor(pasteWithAuthor.author, isFavorite = isFav)
         } catch (e: Exception) {
             throw DatabaseException.QueryFailed("getPasteWithAuthor", e)
         }
@@ -79,7 +82,7 @@ class PasteService(
     /**
      * Создать новую заметку.
      */
-    suspend fun createPaste(request: CreatePasteRequestDto, userId: String?): PasteDto {
+    suspend fun createPaste(request: CreatePasteRequestDto, userId: String?, guestId: String? = null): PasteDto {
         // Валидация входных данных
         val validationResult = ValidationService.validatePasteCreation(request.title, request.content)
         if (validationResult !is ValidationResult.Success) {
@@ -101,7 +104,8 @@ class PasteService(
             createdAt = nowIso,
             updatedAt = nowIso,
             expiresAt = request.expiresAt,
-            syntaxLanguage = normalizeSyntaxLanguage(request.syntaxLanguage) ?: "plaintext"
+            syntaxLanguage = normalizeSyntaxLanguage(request.syntaxLanguage) ?: "plaintext",
+            guestId = guestId
         )
 
         try {
@@ -157,6 +161,25 @@ class PasteService(
     }
 
     /**
+     * Новый метод: заметки гостя
+     */
+    suspend fun getGuestPastes(
+        guestId: String,
+        limit: Int,
+        offset: Int,
+        sortOrder: PasteSortOrder = PasteSortOrder.NEWEST_FIRST
+    ): List<PasteDto> {
+        validatePaginationParams(limit, offset)
+        if (guestId.isBlank()) throw ValidationException.RequiredField("guestId")
+        try {
+            val pastes = repository.getGuestPastes(guestId, null, limit, offset, sortOrder)
+            return pastes.map { it.toPasteDto(isFavorite = null) }
+        } catch (e: Exception) {
+            throw DatabaseException.QueryFailed("getGuestPastes", e)
+        }
+    }
+
+    /**
      * Удалить заметку пользователя.
      */
     suspend fun deletePaste(pasteId: String, userId: String): Boolean {
@@ -165,10 +188,7 @@ class PasteService(
 
         try {
             val deleted = repository.deletePaste(pasteId, userId)
-            if (!deleted) {
-                return false // Вместо исключения возвращаем false для совместимости
-            }
-            return true
+            return deleted
         } catch (e: Exception) {
             throw DatabaseException.QueryFailed("deletePaste", e)
         }

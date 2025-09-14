@@ -6,7 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import java.util.*
 
 /**
@@ -163,5 +163,49 @@ class JwtServiceTest {
             .verify(token)
 
         assertEquals(userId, decodedJWT.getClaim("userId").asString(), "UserId со спецсимволами должен сохраняться")
+    }
+
+    @Test
+    fun `generateGuestToken должен включать guestId и isGuest=true`() {
+        // Given
+        val guestId = UUID.randomUUID().toString()
+        val token = jwtService.generateGuestToken(guestId, ttlMillis = 24 * 3600_000) // сутки для стабильности теста
+
+        // When
+        val decoded = JWT.require(Algorithm.HMAC256(testSecret))
+            .withIssuer(testIssuer)
+            .withAudience(testAudience)
+            .build()
+            .verify(token)
+
+        // Then
+        assertEquals(guestId, decoded.getClaim("guestId").asString())
+        assertTrue(decoded.getClaim("isGuest").asBoolean())
+        // Для гостя userId отсутствует
+        assertNull(decoded.getClaim("userId").asString())
+    }
+
+    @Test
+    fun `generateGuestToken должен устанавливать время истечения`() {
+        // Given
+        val guestId = UUID.randomUUID().toString()
+        val before = Date()
+        val ttl = 2 * 3600_000L // 2 часа
+
+        // When
+        val token = jwtService.generateGuestToken(guestId, ttlMillis = ttl)
+
+        // Then
+        val decoded = JWT.require(Algorithm.HMAC256(testSecret))
+            .withIssuer(testIssuer)
+            .withAudience(testAudience)
+            .build()
+            .verify(token)
+
+        val exp = decoded.expiresAt
+        assertNotNull(exp)
+        val expected = Date(before.time + ttl)
+        val diff = kotlin.math.abs(exp.time - expected.time)
+        assertTrue(diff < 60_000, "Время истечения гостевого токена должно быть примерно через заданный TTL")
     }
 }
