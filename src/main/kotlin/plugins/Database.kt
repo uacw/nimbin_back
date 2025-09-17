@@ -8,6 +8,7 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
 import tech.nimbus.database.tables.PasteTable
 import tech.nimbus.database.tables.UserTable
+import tech.nimbus.database.tables.UserFavoritesTable
 import java.net.URI
 
 fun Application.configureDatabases() {
@@ -15,7 +16,7 @@ fun Application.configureDatabases() {
     val databaseUrl = System.getenv("DATABASE_URL")
 
     val hikariConfig = if (!databaseUrl.isNullOrBlank()) {
-        // Конфигурация для Heroku (производственная среда)
+        // Конфигурация для Heroku (производс��венная среда)
         val dbUri = URI(databaseUrl)
         val username = dbUri.userInfo.split(":")[0]
         val password = dbUri.userInfo.split(":")[1]
@@ -99,6 +100,12 @@ fun Application.configureDatabases() {
             try { exec("UPDATE pastes SET syntax_language='plaintext' WHERE syntax_language IS NULL") } catch (_: Exception) {}
         }
 
+        // 2.1) Нормализация значений visibility: только PUBLIC/UNLISTED/PRIVATE
+        try {
+            exec("UPDATE pastes SET visibility = UPPER(visibility) WHERE visibility IS NOT NULL")
+            exec("UPDATE pastes SET visibility = 'PUBLIC' WHERE visibility IS NULL OR visibility NOT IN ('PUBLIC','UNLISTED','PRIVATE')")
+        } catch (_: Exception) { /* best-effort */ }
+
         // 3) Создать недостающие таблицы/колонки
         // NEW: ensure updated_at exists and is populated
         val hasUpdatedAt = columnExists("pastes", "updated_at")
@@ -129,6 +136,20 @@ fun Application.configureDatabases() {
             exec("CREATE INDEX IF NOT EXISTS idx_user_favorites_paste ON user_favorites(paste_id)")
         } catch (_: Exception) { /* idempotent */ }
 
-        SchemaUtils.createMissingTablesAndColumns(UserTable, PasteTable)
+        // === Guest mode groundwork: add guest_id columns and indexes (idempotent) ===
+        // 1) pastes.guest_id
+        try { exec("ALTER TABLE pastes ADD COLUMN IF NOT EXISTS guest_id VARCHAR(36)") } catch (_: Exception) {}
+        try { exec("CREATE INDEX IF NOT EXISTS idx_pastes_guest_id ON pastes(guest_id)") } catch (_: Exception) {}
+
+        // 2) user_favorites.guest_id
+        try { exec("ALTER TABLE user_favorites ADD COLUMN IF NOT EXISTS guest_id VARCHAR(36)") } catch (_: Exception) {}
+        try { exec("CREATE INDEX IF NOT EXISTS idx_user_favorites_guest_id ON user_favorites(guest_id)") } catch (_: Exception) {}
+
+        // 3) Partial unique indexes to avoid duplicates per user/guest (PostgreSQL only)
+        try { exec("CREATE UNIQUE INDEX IF NOT EXISTS ux_user_favorites_guest ON user_favorites(guest_id, paste_id) WHERE guest_id IS NOT NULL") } catch (_: Exception) {}
+        // Для user_id уникальность уже обеспечена PK (user_id, paste_id)
+
+        // Создание недостающих таблиц/колонок по декларациям Exposed
+        SchemaUtils.createMissingTablesAndColumns(UserTable, PasteTable, UserFavoritesTable)
     }
 }

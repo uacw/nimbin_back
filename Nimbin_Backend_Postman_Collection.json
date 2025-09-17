@@ -5,6 +5,17 @@
     "description": "Полная коллекция тестов для Nimbin Backend API - Pastebin клон на Kotlin/Ktor.\n\nПереключение окружений: установите переменную коллекции run_env = 'local' или 'heroku'. Скрипт коллекции автоматически подставит {{base_url}}.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "variable": [
+    { "key": "run_env", "value": "local" },
+    { "key": "local_url", "value": "http://localhost:8080" },
+    { "key": "heroku_url", "value": "https://nimbin-back-1de949af6629.herokuapp.com" },
+    { "key": "base_url", "value": "http://localhost:8080" },
+    { "key": "jwt_token", "value": "" },
+    { "key": "guest_id", "value": "" },
+    { "key": "user_id", "value": "" },
+    { "key": "paste_id", "value": "" },
+    { "key": "etag", "value": "" }
+  ],
   "event": [
     {
       "listen": "prerequest",
@@ -29,55 +40,57 @@
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n    \"username\": \"test_user_{{$timestamp}}\",\n    \"email\": \"test{{$timestamp}}@example.com\",\n    \"password\": \"secure123\"\n}"
             },
-            "url": {
-              "raw": "{{base_url}}/api/auth/register",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "auth",
-                "register"
-              ]
-            },
+            "url": { "raw": "{{base_url}}/api/auth/register", "host": ["{{base_url}}"], "path": ["api","auth","register"] },
             "description": "Создает новый аккаунт пользователя. Возвращает JWT токен и данные пользователя."
           },
-          "response": []
+          "response": [],
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+              "const json = pm.response.json();",
+              "if (json && json.token) pm.collectionVariables.set('jwt_token', json.token);",
+              "if (json && json.user && json.user.id) pm.collectionVariables.set('user_id', json.user.id);"
+            ] } }
+          ]
         },
         {
-          "name": "Логин существующего пользователя",
+          "name": "Регистрация (��играция гостя)",
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"secure123\"\n}"
+              "raw": "{\n    \"username\": \"migr_user_{{$timestamp}}\",\n    \"email\": \"migr{{$timestamp}}@example.com\",\n    \"password\": \"secure123\"\n}"
             },
-            "url": {
-              "raw": "{{base_url}}/api/auth/login",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "auth",
-                "login"
-              ]
-            },
+            "url": { "raw": "{{base_url}}/api/auth/register", "host": ["{{base_url}}"], "path": ["api","auth","register"] },
+            "description": "Регистрация с заголовком Authorization гостевого токена. Выполняет миграцию pastes и избранного на новый user_id."
+          },
+          "response": [],
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+              "const json = pm.response.json();",
+              "if (json && json.token) pm.collectionVariables.set('jwt_token', json.token);",
+              "if (json && json.user && json.user.id) pm.collectionVariables.set('user_id', json.user.id);"
+            ] } }
+          ]
+        },
+        {
+          "name": "Логин существу��щего пользователя",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n    \"email\": \"test@example.com\",\n    \"password\": \"secure123\"\n}" },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api","auth","login"] },
             "description": "Аутентифицирует существующего пользователя по email. Возвращает JWT токен."
           },
           "response": []
@@ -86,27 +99,9 @@
           "name": "Логин с неверными данными (тест ошибки)",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"email\": \"wrong@example.com\",\n    \"password\": \"wrongpassword\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/auth/login",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "auth",
-                "login"
-              ]
-            },
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n    \"email\": \"wrong@example.com\",\n    \"password\": \"wrongpassword\"\n}" },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api","auth","login"] },
             "description": "Тестирует обработку неверного email или пароля. Должен вернуть 401."
           },
           "response": []
@@ -115,38 +110,18 @@
           "name": "Гостевой вход (POST /api/auth/guest)",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/auth/guest",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "auth",
-                "guest"
-              ]
-            },
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{base_url}}/api/auth/guest", "host": ["{{base_url}}"], "path": ["api","auth","guest"] },
             "description": "Создаёт гостевой JWT (claims: guestId, isGuest=true). Токен сохраняется в переменную {{jwt_token}}."
           },
+          "response": [],
           "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
-                  "var json = pm.response.json();",
-                  "if (json && json.token) { pm.collectionVariables.set('jwt_token', json.token); }",
-                  "if (json && json.user && json.user.id) { pm.collectionVariables.set('guest_id', json.user.id); }"
-                ]
-              }
-            }
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "if (json && json.token) { pm.collectionVariables.set('jwt_token', json.token); }",
+              "if (json && json.user && json.user.id) { pm.collectionVariables.set('guest_id', json.user.id); }"
+            ] } }
           ]
         }
       ]
@@ -285,32 +260,21 @@
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"title\": \"Тестовая заметка с кириллицей\",\n    \"content\": \"Привет мир! Это тестовая заметка на русском языке.\\nПоддерживаются переносы строк и специальные символы: àáâãäåæç\",\n    \"syntaxLanguage\": \"plaintext\",\n    \"visibility\": \"PUBLIC\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/pastes",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pastes"
-              ]
-            },
+            "body": { "mode": "raw", "raw": "{\n    \"title\": \"Тестовая заметка с кириллицей\",\n    \"content\": \"Привет мир! Это тестовая заметка на русском языке.\\nПоддерживаются переносы строк и специальные символы: àáâãäåæç\",\n    \"syntaxLanguage\": \"plaintext\",\n    \"visibility\": \"PUBLIC\"\n}" },
+            "url": { "raw": "{{base_url}}/api/pastes", "host": ["{{base_url}}"], "path": ["api","pastes"] },
             "description": "Создает публичную заметку от имени аутентифицированного пользователя."
           },
-          "response": []
+          "response": [],
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+              "const json = pm.response.json();",
+              "if (json && json.id) pm.collectionVariables.set('paste_id', json.id);"
+            ] } }
+          ]
         },
         {
           "name": "Создать приватную заметку",
@@ -380,259 +344,49 @@
           "name": "Создать анонимную заметку",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"title\": \"Анонимная заметка\",\n    \"content\": \"Эта заметка создана без аутентификации\",\n    \"syntaxLanguage\": \"plaintext\",\n    \"visibility\": \"PUBLIC\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/pastes",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pastes"
-              ]
-            },
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n    \"title\": \"Анонимная заметка\",\n    \"content\": \"Эта заметка создана без аутентификации\",\n    \"syntaxLanguage\": \"plaintext\",\n    \"visibility\": \"PUBLIC\"\n}" },
+            "url": { "raw": "{{base_url}}/api/pastes", "host": ["{{base_url}}"], "path": ["api","pastes"] },
             "description": "Создает анонимную заметку без авторизации."
           },
-          "response": []
+          "response": [],
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+              "const json = pm.response.json();",
+              "if (json && json.id) pm.collectionVariables.set('paste_id', json.id);"
+            ] } }
+          ]
         },
         {
           "name": "Получить заметку по ID",
           "request": {
             "method": "GET",
             "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/pastes/{{paste_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pastes",
-                "{{paste_id}}"
-              ]
-            },
+            "url": { "raw": "{{base_url}}/api/pastes/{{paste_id}}", "host": ["{{base_url}}"], "path": ["api","pastes","{{paste_id}}"] },
             "description": "Получает заметку по ID. Увеличивает счетчик просмотров."
           },
-          "response": []
-        },
-        {
-          "name": "Получить приватную заметку (с токеном)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/pastes/{{paste_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pastes",
-                "{{paste_id}}"
-              ]
-            },
-            "description": "Получает приватную заметку с авторизацией."
-          },
-          "response": []
-        },
-        {
-          "name": "Получить публичные заметки",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/pastes/public?sort=createdAt&order=desc&limit=10&offset=0",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pastes",
-                "public"
-              ],
-              "query": [
-                {
-                  "key": "sort",
-                  "value": "createdAt",
-                  "description": "Сортировка: createdAt, title, viewCount"
-                },
-                {
-                  "key": "order",
-                  "value": "desc",
-                  "description": "Порядок: asc, desc"
-                },
-                {
-                  "key": "limit",
-                  "value": "10",
-                  "description": "Количество записей"
-                },
-                {
-                  "key": "offset",
-                  "value": "0",
-                  "description": "Пропустить записей"
-                }
-              ]
-            },
-            "description": "Получает список публичных заметок с пагинацией и сортировкой."
-          },
-          "response": []
-        },
-        {
-          "name": "Получить свои заметки",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/pastes/my?visibility=ALL&sort=createdAt&order=desc&limit=20&offset=0",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pastes",
-                "my"
-              ],
-              "query": [
-                {
-                  "key": "visibility",
-                  "value": "ALL",
-                  "description": "Фильтр: ALL, PUBLIC, UNLISTED, PRIVATE"
-                },
-                {
-                  "key": "sort",
-                  "value": "createdAt",
-                  "description": "Сортировка"
-                },
-                {
-                  "key": "order",
-                  "value": "desc",
-                  "description": "Порядок"
-                },
-                {
-                  "key": "limit",
-                  "value": "20",
-                  "description": "Количество"
-                },
-                {
-                  "key": "offset",
-                  "value": "0",
-                  "description": "Смещение"
-                }
-              ]
-            },
-            "description": "Получает заметки текущего пользователя с фильтрацией по видимости."
-          },
-          "response": []
-        },
-        {
-          "name": "Получить только приватные заметки",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/pastes/my?visibility=PRIVATE",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pastes",
-                "my"
-              ],
-              "query": [
-                {
-                  "key": "visibility",
-                  "value": "PRIVATE"
-                }
-              ]
-            },
-            "description": "Получает только приватные заметки пользователя."
-          },
-          "response": []
-        },
-        {
-          "name": "Удалить заметку",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/pastes/{{paste_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pastes",
-                "{{paste_id}}"
-              ]
-            },
-            "description": "Удаляет заметку (только автор может удалить свою заметку)."
-          },
-          "response": []
+          "response": [],
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+              "const etag = pm.response.headers.get('ETag');",
+              "if (etag) pm.collectionVariables.set('etag', etag.replace(/\"/g, ''));"
+            ] } }
+          ]
         },
         {
           "name": "Редактировать заметку (If-Match)",
           "request": {
             "method": "PUT",
             "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
-              },
-              {
-                "key": "If-Match",
-                "value": "\"{{etag}}\""
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" },
+              { "key": "If-Match", "value": "\"{{etag}}\"" },
+              { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"Updated title\",\n  \"content\": \"Updated content\",\n  \"syntaxLanguage\": \"kotlin\",\n  \"visibility\": \"PUBLIC\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/pastes/{{paste_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pastes",
-                "{{paste_id}}"
-              ]
-            },
-            "description": "Редактирует заметку с ETag через If-Match. Сначала получите ETag вызовом GET /api/pastes/{{paste_id}} и вставьте его в переменную etag."
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Updated title\",\n  \"content\": \"Updated content\",\n  \"syntaxLanguage\": \"kotlin\",\n  \"visibility\": \"PUBLIC\"\n}" },
+            "url": { "raw": "{{base_url}}/api/pastes/{{paste_id}}", "host": ["{{base_url}}"], "path": ["api","pastes","{{paste_id}}"] },
+            "description": "Редактирует заметку с ETag через If-Match. Сначала выполните GET /api/pastes/{{paste_id}} — ETag сохранится в {{etag}}."
           },
           "response": []
         },
@@ -640,30 +394,9 @@
           "name": "Получить избранные заметки",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/pastes/my?favorite=true",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pastes",
-                "my"
-              ],
-              "query": [
-                {
-                  "key": "favorite",
-                  "value": "true"
-                }
-              ]
-            },
-            "description": "Возвращает только избранные заметки текущего пользователя."
+            "header": [ { "key": "Authorization", "value": "Bearer {{jwt_token}}" } ],
+            "url": { "raw": "{{base_url}}/api/pastes/my?favorite=true", "host": ["{{base_url}}"], "path": ["api","pastes","my"], "query": [ { "key": "favorite", "value": "true" } ] },
+            "description": "Возвращает только избранные заметки текущей сессии (пользователь или гость)."
           },
           "response": []
         },
@@ -671,24 +404,8 @@
           "name": "Добавить в избранное",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/pastes/{{paste_id}}/favorite",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pastes",
-                "{{paste_id}}",
-                "favorite"
-              ]
-            },
+            "header": [ { "key": "Authorization", "value": "Bearer {{jwt_token}}" } ],
+            "url": { "raw": "{{base_url}}/api/pastes/{{paste_id}}/favorite", "host": ["{{base_url}}"], "path": ["api","pastes","{{paste_id}}","favorite"] },
             "description": "Добавляет указанную заметку в избранное."
           },
           "response": []
@@ -697,24 +414,8 @@
           "name": "Удалить из избранного",
           "request": {
             "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{jwt_token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/pastes/{{paste_id}}/favorite",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pastes",
-                "{{paste_id}}",
-                "favorite"
-              ]
-            },
+            "header": [ { "key": "Authorization", "value": "Bearer {{jwt_token}}" } ],
+            "url": { "raw": "{{base_url}}/api/pastes/{{paste_id}}/favorite", "host": ["{{base_url}}"], "path": ["api","pastes","{{paste_id}}","favorite"] },
             "description": "Удаляет указанную заметку из избранного."
           },
           "response": []
@@ -893,53 +594,6 @@
           "response": []
         }
       ]
-    }
-  ],
-  "variable": [
-    {
-      "key": "run_env",
-      "value": "local",
-      "description": "Выбор окружения: local или heroku"
-    },
-    {
-      "key": "local_url",
-      "value": "http://localhost:8080",
-      "description": "Base URL для локальной разработки"
-    },
-    {
-      "key": "heroku_url",
-      "value": "https://nimbin-back-1de949af6629.herokuapp.com",
-      "description": "Base URL для Heroku deployment"
-    },
-    {
-      "key": "base_url",
-      "value": "https://nimbin-back-1de949af6629.herokuapp.com",
-      "description": "АКТИВНЫЙ Base URL (подставляется скриптом в зависимости от run_env)"
-    },
-    {
-      "key": "jwt_token",
-      "value": "",
-      "description": "JWT токен из ответа аутентификации. Скопируйте сюда токен после логина."
-    },
-    {
-      "key": "user_id",
-      "value": "",
-      "description": "ID пользователя для тестирования профилей"
-    },
-    {
-      "key": "paste_id",
-      "value": "",
-      "description": "ID заметки для тестирования"
-    },
-    {
-      "key": "private_paste_id",
-      "value": "",
-      "description": "ID приватной заметки для тестирования доступа"
-    },
-    {
-      "key": "etag",
-      "value": "",
-      "description": "ETag для If-Match при редактировании"
     }
   ]
 }

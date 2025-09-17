@@ -5,6 +5,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 import tech.nimbus.database.tables.UserTable
 import tech.nimbus.database.tables.PasteTable
+import tech.nimbus.database.tables.UserFavoritesTable
 import tech.nimbus.models.User
 import tech.nimbus.models.UserPublicInfo
 import tech.nimbus.models.PasteVisibility
@@ -14,12 +15,12 @@ import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 /**
- * Репоз����торий для работы с пользователями.
+ * Репозиторий для работы с пользователями.
  */
 class UserRepository {
 
     /**
-     * Находит пользователя по username и возвращает пару (userId, passwordHash).
+     * Наход��т пользователя по username и возвращает пару (userId, passwordHash).
      */
     fun findByUsername(username: String): Pair<String, String>? = transaction {
         UserTable.selectAll()
@@ -154,7 +155,7 @@ class UserRepository {
     }
 
     /**
-     * Проверяет, существует ли пользователь с данным email.
+     * Проверяет, существует ли пользователь с ��анным email.
      */
     fun emailExists(email: String): Boolean = transaction {
         UserTable.selectAll()
@@ -187,5 +188,55 @@ class UserRepository {
      */
     fun verifyPassword(password: String, passwordHash: String): Boolean {
         return BCrypt.verifyer().verify(password.toCharArray(), passwordHash).verified
+    }
+
+    /**
+     * Мигрирует данные гостя на созданного пользователя.
+     * Выполняется в одной транзакции и идемпотентна.
+     * Возвращает количество затронутых записей (приближенно) или -1 при ошибке.
+     */
+    fun migrateGuestData(guestId: String, newUserId: String): Int = transaction {
+        var affected = 0
+        try {
+            // 1) Перенос pastes гостя -> пользователю
+            val updPastes = PasteTable.update({ PasteTable.guestId eq guestId }) {
+                it[PasteTable.userId] = newUserId
+                it[PasteTable.guestId] = null
+            }
+            affected += updPastes
+
+            // 2) Перенос избранного гостя -> пользователю (построчно, игнорируем дубли PK)
+            val guestFavRows = UserFavoritesTable
+                .slice(UserFavoritesTable.pasteId, UserFavoritesTable.createdAt)
+                .select { UserFavoritesTable.guestId eq guestId }
+                .toList()
+
+            var insFav = 0
+            guestFavRows.forEach { row ->
+                val pid = row[UserFavoritesTable.pasteId]
+                val createdAt = row[UserFavoritesTable.createdAt]
+                try {
+                    UserFavoritesTable.insert { ins ->
+                        ins[UserFavoritesTable.userId] = newUserId
+                        ins[UserFavoritesTable.pasteId] = pid
+                        ins[UserFavoritesTable.createdAt] = createdAt
+                        ins[UserFavoritesTable.guestId] = null
+                    }
+                    insFav++
+                } catch (_: Exception) {
+                    // duplicate (user_id, paste_id) — пропускаем
+                }
+            }
+            affected += insFav
+
+            // 3) Очистка гостевых записей в избранном
+            val delFav = UserFavoritesTable.deleteWhere { UserFavoritesTable.guestId eq guestId }
+            affected += delFav
+
+            affected
+        } catch (_: Exception) {
+            rollback()
+            -1
+        }
     }
 }

@@ -16,6 +16,7 @@ class FavoritesRepository : IFavoritesRepository {
             UserFavoritesTable.insert {
                 it[UserFavoritesTable.userId] = userId
                 it[UserFavoritesTable.pasteId] = pasteId
+                it[UserFavoritesTable.guestId] = null
             }
             true
         } catch (_: Exception) {
@@ -39,6 +40,40 @@ class FavoritesRepository : IFavoritesRepository {
     override suspend fun listFavoritePasteIds(userId: String, limit: Int, offset: Int): List<String> = transaction {
         UserFavoritesTable
             .select { UserFavoritesTable.userId eq userId }
+            .limit(limit, offset.toLong())
+            .map { it[UserFavoritesTable.pasteId] }
+    }
+
+    // === Гостевой режим — используем user_favorites.guest_id ===
+    override suspend fun addFavoriteGuest(guestId: String, pasteId: String): Boolean = transaction {
+        try {
+            UserFavoritesTable.insert {
+                it[UserFavoritesTable.userId] = "" // placeholder для совместимости со схемой
+                it[UserFavoritesTable.pasteId] = pasteId
+                it[UserFavoritesTable.guestId] = guestId
+            }
+            true
+        } catch (_: Exception) {
+            // Конфликт PK (повтор) или иная ошибка — считаем как не добавлено
+            false
+        }
+    }
+
+    override suspend fun removeFavoriteGuest(guestId: String, pasteId: String): Boolean = transaction {
+        UserFavoritesTable.deleteWhere {
+            (UserFavoritesTable.guestId eq guestId) and (UserFavoritesTable.pasteId eq pasteId)
+        } > 0
+    }
+
+    override suspend fun isFavoriteGuest(guestId: String, pasteId: String): Boolean = transaction {
+        UserFavoritesTable.select {
+            (UserFavoritesTable.guestId eq guestId) and (UserFavoritesTable.pasteId eq pasteId)
+        }.limit(1).empty().not()
+    }
+
+    override suspend fun listFavoritePasteIdsGuest(guestId: String, limit: Int, offset: Int): List<String> = transaction {
+        UserFavoritesTable
+            .select { UserFavoritesTable.guestId eq guestId }
             .limit(limit, offset.toLong())
             .map { it[UserFavoritesTable.pasteId] }
     }

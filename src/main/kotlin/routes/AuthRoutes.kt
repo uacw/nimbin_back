@@ -94,6 +94,20 @@ fun Route.authRoutes(jwtService: JwtService, userRepository: UserRepository) {
                     throw UserException.UserCreationFailed()
                 }
 
+                // Попытка миграции гостевых данных, если есть гостевой токен в Authorization
+                val authHeader = call.request.headers[HttpHeaders.Authorization]?.trim()
+                val bearerToken = authHeader?.let { if (it.startsWith("Bearer ", ignoreCase = true)) it.substring(7).trim() else it }
+                val decoded = bearerToken?.let { jwtService.verify(it) }
+                val isGuest = decoded?.getClaim("isGuest")?.asBoolean() ?: false
+                val guestId = if (isGuest) decoded?.getClaim("guestId")?.asString() else null
+                if (!guestId.isNullOrBlank()) {
+                    try {
+                        userRepository.migrateGuestData(guestId, userId)
+                    } catch (_: Exception) {
+                        // Миграция best-effort: не блокируем регистрацию при отказе миграции
+                    }
+                }
+
                 val token = jwtService.generateToken(userId)
                 call.respond(HttpStatusCode.Created, AuthResponseDto(token, user.toUserDto()))
             }

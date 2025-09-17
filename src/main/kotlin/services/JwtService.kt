@@ -2,6 +2,7 @@ package tech.nimbus.services
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import com.auth0.jwt.interfaces.DecodedJWT
 import java.util.Date
 
 /**
@@ -50,7 +51,7 @@ class JwtService(
      *
      * @param guestId Уникальный идентификатор гостя
      * @param ttlMillis Время жизни токена в миллисекундах (по умолчанию 30 дней)
-     * @return Подписанный гостевой JWT токен в виде строки
+     * @return Подписанный гост��вой JWT токен в виде строки
      *
      * @sample generateGuestToken("guest-uuid-here") // "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
      */
@@ -61,4 +62,27 @@ class JwtService(
         .withClaim("isGuest", true)
         .withExpiresAt(Date(System.currentTimeMillis() + ttlMillis))
         .sign(algorithm)
+
+    /**
+     * Верифицирует JWT токен и возвращает его полезную нагрузку (claims).
+     *
+     * Проверяет подпись токена, его аудиторию и издателя.
+     * Если токен действителен, возвращает объект DecodedJWT с информацией из токена.
+     * Если токен недействителен, возвращает null.
+     *
+     * @param token JWT токен для верификации
+     * @return Объект DecodedJWT с полезной нагрузкой токена или null, если токен недействителен
+     *
+     * @sample verify("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
+     */
+    fun verify(token: String): DecodedJWT? = try {
+        JWT
+            .require(algorithm)
+            .withAudience(audience)
+            .withIssuer(issuer)
+            .build()
+            .verify(token)
+    } catch (_: Exception) {
+        null
+    }
 }

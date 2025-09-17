@@ -21,6 +21,7 @@ import tech.nimbus.utils.DtoConverters.toPasteDtoWithAuthor
 import tech.nimbus.utils.DtoConverters.toInternalVisibility
 import tech.nimbus.utils.EtagUtil
 import tech.nimbus.database.repositories.FavoritesRepository
+import tech.nimbus.models.PasteVisibility
 
 /**
  * Роуты для работы с заметками.
@@ -121,8 +122,21 @@ fun Route.pasteRoutes() {
                         }
                         guestId != null -> {
                             if (favoriteOnly) {
-                                // Избранное для гостя пока не поддержано на уровне БД
-                                return@safeExecute call.respondError(HttpStatusCode.NotImplemented, "Guest favorites not supported yet")
+                                // Список избранного гостя
+                                val ids = favoritesRepository.listFavoritePasteIdsGuest(guestId, pagination.limit, pagination.offset)
+                                val result = mutableListOf<tech.nimbus.shared.dto.PasteDto>()
+                                for (id in ids) {
+                                    val pwa = pasteRepository.getPasteWithAuthor(id) ?: continue
+                                    val p = pwa.paste
+                                    val accessible = when (p.visibility) {
+                                        PasteVisibility.PUBLIC, PasteVisibility.UNLISTED -> true
+                                        PasteVisibility.PRIVATE -> p.userId == null && p.guestId == guestId
+                                    }
+                                    if (accessible) {
+                                        result.add(p.toPasteDtoWithAuthor(pwa.author, isFavorite = true))
+                                    }
+                                }
+                                return@safeExecute call.respond(HttpStatusCode.OK, result)
                             }
                             val guestPastes = pasteService.getGuestPastes(
                                 guestId = guestId,
@@ -149,14 +163,29 @@ fun Route.pasteRoutes() {
                         ?: return@safeExecute call.respondError(HttpStatusCode.BadRequest, "Missing paste ID")
 
                     val userId = call.getCurrentUserId()
-                        ?: return@safeExecute call.respondError(HttpStatusCode.Unauthorized, "Authentication required")
+                    val guestId = call.getCurrentGuestId()
 
-                    // Проверяем доступность заметки для пользователя
-                    if (!pasteRepository.canAccessPaste(id, userId)) {
-                        return@safeExecute call.respondError(HttpStatusCode.NotFound, "Paste not found")
+                    val paste = pasteRepository.getPasteById(id)
+                        ?: return@safeExecute call.respondError(HttpStatusCode.NotFound, "Paste not found")
+
+                    val accessible = when (paste.visibility) {
+                        PasteVisibility.PUBLIC, PasteVisibility.UNLISTED -> true
+                        PasteVisibility.PRIVATE -> when {
+                            userId != null -> paste.userId == userId
+                            guestId != null -> paste.userId == null && paste.guestId == guestId
+                            else -> false
+                        }
                     }
+                    if (!accessible) return@safeExecute call.respondError(HttpStatusCode.NotFound, "Paste not found")
 
-                    favoritesRepository.addFavorite(userId, id)
+                    val ok = when {
+                        userId != null -> favoritesRepository.addFavorite(userId, id)
+                        guestId != null -> favoritesRepository.addFavoriteGuest(guestId, id)
+                        else -> false
+                    }
+                    if (!ok) {
+                        return@safeExecute call.respond(HttpStatusCode.OK, DeleteResponseDto("Already in favorites or skipped"))
+                    }
                     call.respond(HttpStatusCode.OK, DeleteResponseDto("Added to favorites"))
                 }
             }
@@ -168,10 +197,18 @@ fun Route.pasteRoutes() {
                         ?: return@safeExecute call.respondError(HttpStatusCode.BadRequest, "Missing paste ID")
 
                     val userId = call.getCurrentUserId()
-                        ?: return@safeExecute call.respondError(HttpStatusCode.Unauthorized, "Authentication required")
+                    val guestId = call.getCurrentGuestId()
 
-                    favoritesRepository.removeFavorite(userId, id)
-                    call.respond(HttpStatusCode.OK, DeleteResponseDto("Removed from favorites"))
+                    val ok = when {
+                        userId != null -> favoritesRepository.removeFavorite(userId, id)
+                        guestId != null -> favoritesRepository.removeFavoriteGuest(guestId, id)
+                        else -> false
+                    }
+                    if (ok) {
+                        call.respond(HttpStatusCode.OK, DeleteResponseDto("Removed from favorites"))
+                    } else {
+                        call.respond(HttpStatusCode.OK, DeleteResponseDto("Nothing to remove"))
+                    }
                 }
             }
 

@@ -72,7 +72,11 @@ class PasteService(
             // Увеличиваем счетчик просмотров
             repository.incrementViewCount(pasteId)
 
-            val isFav = if (userId != null) favorites.isFavorite(userId, pasteId) else null
+            val isFav: Boolean? = when {
+                userId != null -> favorites.isFavorite(userId, pasteId)
+                guestId != null -> favorites.isFavoriteGuest(guestId, pasteId)
+                else -> null
+            }
             return paste.toPasteDtoWithAuthor(pasteWithAuthor.author, isFavorite = isFav)
         } catch (e: Exception) {
             throw DatabaseException.QueryFailed("getPasteWithAuthor", e)

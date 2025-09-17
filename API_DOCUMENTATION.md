@@ -47,8 +47,54 @@ Authorization: Bearer <jwt_token>
 5. Обновление токена при истечении (через повторный логин)
 
 ### Время жизни токена:
-- 24 часа с момента выпуска
-- После истечения требуется повторный логин
+- 24 часа с момента выпуска (обычный пользовательский токен)
+- Гостевой токен — по умолчанию до 30 дней
+
+---
+
+## 🧳 Гостевой режим
+
+### Получить гостевой токен
+```http
+POST /api/auth/guest
+Content-Type: application/json
+```
+**Ответ (201 Created):**
+```json
+{
+  "token": "<guest-jwt>",
+  "user": {
+    "id": "<guestId>",
+    "username": "guest-xxxx",      
+    "displayName": null,
+    "email": "",
+    "createdAt": "ISO"
+  }
+}
+```
+Примечания:
+- Токен содержит claims: `{ "guestId": "...", "isGuest": true }`.
+- Поле `user` в ответе — синтетическое, чтобы сохранить контракт DTO; в БД гость не создаётся как полноценный пользователь.
+
+### Миграция данных гостя при регистрации
+```http
+POST /api/auth/register
+Authorization: Bearer <guest_jwt>
+Content-Type: application/json
+
+{
+  "username": "john_doe",
+  "email": "john@example.com",
+  "password": "secure123"
+}
+```
+Поведение:
+- Если заголовок Authorization содержит валидный гостевой токен, сервер:
+  - переносит ��се `pastes` с `guest_id` гостя на `user_id` нового пользователя (и очищает `guest_id`),
+  - переносит избранное из `user_favorites.guest_id` в записи с `user_id` (без дублей),
+  - очищает гостевые записи избранного,
+  - возвращает обычный пользовательский JWT.
+- Без заголовка Authorization регистрация работает как обычно.
 
 ---
 
@@ -116,6 +162,12 @@ Content-Type: application/json
 **Возможные ошибки:**
 - 400 Bad Request — некорректные данные
 - 401 Unauthorized — неверный email или пароль
+
+#### Гостевой вход
+```http
+POST /api/auth/guest
+```
+Возвращает гостевой JWT и синтетического пользователя (см. раздел «Гостевой режим»).
 
 ---
 
@@ -213,7 +265,7 @@ Content-Type: application/json
 - `updatedAt` — время последнего обновления
 - `etag` — текущая версия для If-Match
 - `syntaxLanguage` — язык подсветки
-- `isFavorite` — признак, что заметка в избранном у текущего пользователя (присутствует при запросах с токеном)
+- `isFavorite` — признак, что заметка в избранном у текущего пользователя (или гостя при гостевом токене)
 
 #### Создать заметку
 ```http
@@ -312,19 +364,12 @@ Authorization: Bearer <jwt_token>  # Необязательно; при нали
 
 #### Получить свои заметки (требует аутентификации)
 ```http
-GET /api/pastes/my?visibility={ALL|PUBLIC|UNLISTED|PRIVATE}&sort={createdAt|title|viewCount}&order={asc|desc}&limit=20&offset=0
+GET /api/pastes/my?visibility={ALL|PUBLIC|UNLISTED|PRIVATE}&sort={createdAt|title|viewCount}&order={asc|desc}&limit=20&offset=0&favorite=true
 Authorization: Bearer <jwt_token>
 ```
-
-Параметры:
-- `visibility`: ALL (по умолчанию), PUBLIC, UNLISTED, PRIVATE
-- `sort`: createdAt (по умолчанию), title, viewCount
-- `order`: desc (по умолчанию), asc
-- `limit`: максимум 100 (по умолчанию 20)
-- `offset`: смещение
-- `favorite`: `true` — вернуть только избранные заметки (новый параметр)
-
-**Пример:** `GET /api/pastes/my?favorite=true`
+Особенности:
+- С пользовательским токеном возвращаются заметки пользователя, `favorite=true` — только избранные пользователя.
+- С гостевым токеном возвращаются заметки гостя; `favorite=true` — только избранные гостя.
 
 #### Удалить заметку (требует аутентификации)
 ```http
@@ -343,10 +388,7 @@ Authorization: Bearer <jwt_token>
 POST /api/pastes/{pasteId}/favorite
 Authorization: Bearer <jwt_token>
 ```
-
-**Ответ (200 OK):** `{ "message": "Added to favorites" }`
-
-**Ошибки:** 401, 404 (если нет доступа к заметке)
+Работает как для обычного пользователя, так и для гостя (в гостевом случае связь хранится по `guest_id`).
 
 #### Удалить заметку из избранного
 ```http
@@ -354,9 +396,12 @@ DELETE /api/pastes/{pasteId}/favorite
 Authorization: Bearer <jwt_token>
 ```
 
-**Ответ (200 OK):** `{ "message": "Removed from favorites" }`
-
-**Ошибки:** 401
+#### Список избранного
+```http
+GET /api/pastes/my?favorite=true
+Authorization: Bearer <jwt_token>
+```
+Возвращает избранное текущей сессии (пользователь или гость).
 
 ---
 
@@ -407,24 +452,3 @@ API возвращает ошибки в формате:
 ---
 
 *Документация актуализирована: 13 сентября 2025*
-
----
-
-## Гостевой режим (Guest)
-
-- Назначение: дать пользователю временный JWT без регистрации.
-- Новый эндпоинт:
-  - POST /api/auth/guest
-    - Без авторизации.
-    - Ответ 201 Created:
-      {
-        "token": "<jwt>",
-        "user": {
-          "id": "<guestId>",
-          "username": "guest-xxxxxxxx",
-          "displayName": null,
-          "email": "",
-          "createdAt": "ISO"
-        }
-      }
-    - Токен содержит claims: { guestId, isGuest=true }.
