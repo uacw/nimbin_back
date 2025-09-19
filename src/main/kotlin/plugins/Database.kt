@@ -116,7 +116,7 @@ fun Application.configureDatabases() {
             try { exec("ALTER TABLE pastes ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP") } catch (_: Exception) {}
         }
 
-        // NEW: favorites table (idempotent)
+        // NEW: favorites table (idempotent) — создаём без PK, только с FK
         try {
             exec(
                 """
@@ -124,7 +124,6 @@ fun Application.configureDatabases() {
                     user_id  VARCHAR(36) NOT NULL,
                     paste_id VARCHAR(12) NOT NULL,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    CONSTRAINT pk_user_favorites PRIMARY KEY (user_id, paste_id),
                     CONSTRAINT fk_user_favorites_user FOREIGN KEY (user_id)
                         REFERENCES users(id) ON DELETE CASCADE,
                     CONSTRAINT fk_user_favorites_paste FOREIGN KEY (paste_id)
@@ -145,9 +144,22 @@ fun Application.configureDatabases() {
         try { exec("ALTER TABLE user_favorites ADD COLUMN IF NOT EXISTS guest_id VARCHAR(36)") } catch (_: Exception) {}
         try { exec("CREATE INDEX IF NOT EXISTS idx_user_favorites_guest_id ON user_favorites(guest_id)") } catch (_: Exception) {}
 
-        // 3) Partial unique indexes to avoid duplicates per user/guest (PostgreSQL only)
+        // 2.1) Приводим схему user_favorites к гостевому режиму: убираем PK и делаем user_id NULLABLE
+        try {
+            // Снимаем старые PK, если они есть
+            exec("ALTER TABLE user_favorites DROP CONSTRAINT IF EXISTS pk_user_favorites")
+        } catch (_: Exception) {}
+        try {
+            exec("ALTER TABLE user_favorites DROP CONSTRAINT IF EXISTS user_favorites_pkey")
+        } catch (_: Exception) {}
+        // Делаем user_id nullable (если уже nullable — просто пройдёт мимо)
+        try { exec("ALTER TABLE user_favorites ALTER COLUMN user_id DROP NOT NULL") } catch (_: Exception) {}
+
+        // 3) Частичные уникальные индексы для предотвращения дублей (если СУБД поддерживает)
+        // guests
         try { exec("CREATE UNIQUE INDEX IF NOT EXISTS ux_user_favorites_guest ON user_favorites(guest_id, paste_id) WHERE guest_id IS NOT NULL") } catch (_: Exception) {}
-        // Для user_id уникальность уже обеспечена PK (user_id, paste_id)
+        // users
+        try { exec("CREATE UNIQUE INDEX IF NOT EXISTS ux_user_favorites_user ON user_favorites(user_id, paste_id) WHERE user_id IS NOT NULL") } catch (_: Exception) {}
 
         // Создание недостающих таблиц/колонок по декларациям Exposed
         SchemaUtils.createMissingTablesAndColumns(UserTable, PasteTable, UserFavoritesTable)

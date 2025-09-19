@@ -12,6 +12,12 @@ import tech.nimbus.database.tables.UserFavoritesTable
 class FavoritesRepository : IFavoritesRepository {
 
     override suspend fun addFavorite(userId: String, pasteId: String): Boolean = transaction {
+        // Идемпотентная проверка
+        val exists = UserFavoritesTable.select {
+            (UserFavoritesTable.userId eq userId) and (UserFavoritesTable.pasteId eq pasteId)
+        }.limit(1).empty().not()
+        if (exists) return@transaction false
+
         try {
             UserFavoritesTable.insert {
                 it[UserFavoritesTable.userId] = userId
@@ -20,7 +26,6 @@ class FavoritesRepository : IFavoritesRepository {
             }
             true
         } catch (_: Exception) {
-            // Конфликт PK (повтор) или иная ошибка — считаем как не добавлено
             false
         }
     }
@@ -46,15 +51,20 @@ class FavoritesRepository : IFavoritesRepository {
 
     // === Гостевой режим — используем user_favorites.guest_id ===
     override suspend fun addFavoriteGuest(guestId: String, pasteId: String): Boolean = transaction {
+        // Идемпотентная проверка
+        val exists = UserFavoritesTable.select {
+            (UserFavoritesTable.guestId eq guestId) and (UserFavoritesTable.pasteId eq pasteId)
+        }.limit(1).empty().not()
+        if (exists) return@transaction false
+
         try {
             UserFavoritesTable.insert {
-                it[UserFavoritesTable.userId] = "" // placeholder для совместимости со схемой
+                it[UserFavoritesTable.userId] = null // для гостя user_id = NULL
                 it[UserFavoritesTable.pasteId] = pasteId
                 it[UserFavoritesTable.guestId] = guestId
             }
             true
         } catch (_: Exception) {
-            // Конфликт PK (повтор) или иная ошибка — считаем как не добавлено
             false
         }
     }

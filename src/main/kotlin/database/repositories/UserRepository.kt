@@ -205,7 +205,7 @@ class UserRepository {
             }
             affected += updPastes
 
-            // 2) Перенос избранного гостя -> пользователю (построчно, игнорируем дубли PK)
+            // 2) Перенос избранного гостя -> пользователю (идемпотентно, без дубликатов)
             val guestFavRows = UserFavoritesTable
                 .slice(UserFavoritesTable.pasteId, UserFavoritesTable.createdAt)
                 .select { UserFavoritesTable.guestId eq guestId }
@@ -215,16 +215,24 @@ class UserRepository {
             guestFavRows.forEach { row ->
                 val pid = row[UserFavoritesTable.pasteId]
                 val createdAt = row[UserFavoritesTable.createdAt]
-                try {
-                    UserFavoritesTable.insert { ins ->
-                        ins[UserFavoritesTable.userId] = newUserId
-                        ins[UserFavoritesTable.pasteId] = pid
-                        ins[UserFavoritesTable.createdAt] = createdAt
-                        ins[UserFavoritesTable.guestId] = null
+
+                // Проверяем, нет ли уже у пользователя этого избранного
+                val exists = UserFavoritesTable.select {
+                    (UserFavoritesTable.userId eq newUserId) and (UserFavoritesTable.pasteId eq pid)
+                }.limit(1).empty().not()
+
+                if (!exists) {
+                    try {
+                        UserFavoritesTable.insert { ins ->
+                            ins[UserFavoritesTable.userId] = newUserId
+                            ins[UserFavoritesTable.pasteId] = pid
+                            ins[UserFavoritesTable.createdAt] = createdAt
+                            ins[UserFavoritesTable.guestId] = null
+                        }
+                        insFav++
+                    } catch (_: Exception) {
+                        // На всякий случай — если параллельно возник конфликт, просто пропускаем
                     }
-                    insFav++
-                } catch (_: Exception) {
-                    // duplicate (user_id, paste_id) — пропускаем
                 }
             }
             affected += insFav

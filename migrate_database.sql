@@ -118,3 +118,53 @@ BEGIN
         EXECUTE 'CREATE UNIQUE INDEX ux_user_favorites_guest ON user_favorites(guest_id, paste_id) WHERE guest_id IS NOT NULL';
     END IF;
 END$$;
+
+-- === Adjust user_favorites for guest mode (idempotent) ===
+DO $$
+BEGIN
+    -- Drop old composite primary key if present (both common names)
+    IF EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE table_name = 'user_favorites' AND constraint_type = 'PRIMARY KEY' AND constraint_name = 'pk_user_favorites'
+    ) THEN
+        ALTER TABLE user_favorites DROP CONSTRAINT pk_user_favorites;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE table_name = 'user_favorites' AND constraint_type = 'PRIMARY KEY' AND constraint_name = 'user_favorites_pkey'
+    ) THEN
+        ALTER TABLE user_favorites DROP CONSTRAINT user_favorites_pkey;
+    END IF;
+END$$;
+
+-- Make user_id nullable to allow guest rows
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'user_favorites' AND column_name = 'user_id'
+    ) THEN
+        BEGIN
+            ALTER TABLE user_favorites ALTER COLUMN user_id DROP NOT NULL;
+        EXCEPTION WHEN others THEN
+            -- ignore if already nullable or blocked
+            NULL;
+        END;
+    END IF;
+END$$;
+
+-- Ensure partial unique indexes exist (may already be created above)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'ux_user_favorites_user'
+    ) THEN
+        EXECUTE 'CREATE UNIQUE INDEX ux_user_favorites_user ON user_favorites(user_id, paste_id) WHERE user_id IS NOT NULL';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'ux_user_favorites_guest'
+    ) THEN
+        EXECUTE 'CREATE UNIQUE INDEX ux_user_favorites_guest ON user_favorites(guest_id, paste_id) WHERE guest_id IS NOT NULL';
+    END IF;
+END$$;
